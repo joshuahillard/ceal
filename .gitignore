@@ -1,0 +1,30 @@
+# Environment
+.env
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Data (scraped data stays local)
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+
+# Coverage
+htmlcov/
+.coverage
+
+# Pytest
+.pytest_cache/
+pytest-cache-files-*/
