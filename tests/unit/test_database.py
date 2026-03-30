@@ -14,6 +14,7 @@ in ~200ms with zero disk I/O and no cleanup needed."
 """
 
 import os
+
 import pytest
 import pytest_asyncio
 
@@ -41,7 +42,6 @@ from src.models.entities import (
     RemoteType,
     ScrapeLogCreate,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -90,8 +90,9 @@ class TestSchemaInit:
     @pytest.mark.asyncio
     async def test_company_tiers_seeded(self):
         """Tier 1-3 companies should be pre-loaded."""
-        from src.models.database import get_session
         from sqlalchemy import text
+
+        from src.models.database import get_session
 
         async with get_session() as session:
             result = await session.execute(
@@ -103,8 +104,9 @@ class TestSchemaInit:
     @pytest.mark.asyncio
     async def test_skills_seeded(self):
         """Skills vocabulary should be pre-loaded."""
-        from src.models.database import get_session
         from sqlalchemy import text
+
+        from src.models.database import get_session
 
         async with get_session() as session:
             result = await session.execute(
@@ -194,10 +196,11 @@ class TestTierAssignment:
         updated = await assign_company_tiers()
         assert updated == 1
 
-        jobs = await get_unranked_jobs()
+        await get_unranked_jobs()
         # Need to query with tier info
-        from src.models.database import get_session
         from sqlalchemy import text
+
+        from src.models.database import get_session
 
         async with get_session() as session:
             result = await session.execute(
@@ -212,8 +215,9 @@ class TestTierAssignment:
         await upsert_job(_make_job(company="RandomStartup"))
         await assign_company_tiers()
 
-        from src.models.database import get_session
         from sqlalchemy import text
+
+        from src.models.database import get_session
 
         async with get_session() as session:
             result = await session.execute(
@@ -243,8 +247,9 @@ class TestRanking:
         )
         await update_job_ranking(result)
 
-        from src.models.database import get_session
         from sqlalchemy import text
+
+        from src.models.database import get_session
 
         async with get_session() as session:
             r = await session.execute(
@@ -323,8 +328,9 @@ class TestResumeProfile:
             evidence="Built Moss Lane trading bot and Céal pipeline",
         )
 
-        from src.models.database import get_session
         from sqlalchemy import text
+
+        from src.models.database import get_session
 
         async with get_session() as session:
             result = await session.execute(

@@ -23,10 +23,11 @@ Architecture decisions (interview-defensible):
 from __future__ import annotations
 
 import os
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncGenerator, Optional, Sequence
 
+import structlog
 from dotenv import load_dotenv
 from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import (
@@ -35,11 +36,9 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.pool import StaticPool
-import structlog
 
 from src.models.entities import (
     JobListingCreate,
-    JobSource,
     RankedResult,
     ScrapeLogCreate,
 )
@@ -130,7 +129,7 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 # Schema Initialization
 # ---------------------------------------------------------------------------
 
-async def init_db(schema_path: Optional[str] = None) -> None:
+async def init_db(schema_path: str | None = None) -> None:
     """
     Initialize the database from the SQL schema file.
     Idempotent — safe to call on every startup because all CREATE statements
@@ -449,7 +448,7 @@ async def assign_company_tiers() -> int:
 
 async def get_top_matches(
     min_score: float = 0.5,
-    tier: Optional[int] = None,
+    tier: int | None = None,
     limit: int = 20,
 ) -> list[dict]:
     """
@@ -517,7 +516,7 @@ async def log_scrape_run(log: ScrapeLogCreate) -> int:
 # ---------------------------------------------------------------------------
 
 async def create_resume_profile(
-    name: str, version: str = "1.0", raw_text: Optional[str] = None
+    name: str, version: str = "1.0", raw_text: str | None = None
 ) -> int:
     """Create a resume profile for matching jobs against."""
     async with get_session() as session:
@@ -535,8 +534,8 @@ async def link_resume_skill(
     profile_id: int,
     skill_name: str,
     proficiency: str,
-    years_experience: Optional[float] = None,
-    evidence: Optional[str] = None,
+    years_experience: float | None = None,
+    evidence: str | None = None,
 ) -> None:
     """Link a skill to a resume profile. Looks up skill by name."""
     async with get_session() as session:

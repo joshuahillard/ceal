@@ -12,14 +12,12 @@ validation catches malformed responses."
 from __future__ import annotations
 
 import json
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-import pytest_asyncio
-from unittest.mock import AsyncMock, patch, MagicMock
 
 from src.models.entities import RankedResult
-from src.ranker.llm_ranker import LLMRanker, RANKER_VERSION
-
+from src.ranker.llm_ranker import RANKER_VERSION, LLMRanker
 
 # ---------------------------------------------------------------------------
 # Mock LLM Responses

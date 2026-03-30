@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import (
     BaseModel,
@@ -24,7 +23,6 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-
 
 # ---------------------------------------------------------------------------
 # Enums — constrained at the type level, not just string checks
@@ -89,13 +87,13 @@ class SkillBase(BaseModel):
 
 class SkillCreate(SkillBase):
     """Used when inserting a new skill into the vocabulary table."""
-    canonical_name: Optional[str] = None
+    canonical_name: str | None = None
 
 
 class Skill(SkillBase):
     """Full skill record from the database."""
     id: int
-    canonical_name: Optional[str] = None
+    canonical_name: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -114,10 +112,10 @@ class RawJobListing(BaseModel):
     title: str
     company_name: str
     url: str
-    location: Optional[str] = None
+    location: str | None = None
     remote_type: RemoteType = RemoteType.UNKNOWN
-    salary_text: Optional[str] = None  # Raw "$90K - $140K" before parsing
-    description_raw: Optional[str] = None
+    salary_text: str | None = None  # Raw "$90K - $140K" before parsing
+    description_raw: str | None = None
 
     @field_validator("url")
     @classmethod
@@ -148,18 +146,18 @@ class JobListingCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=500)
     company_name: str = Field(..., min_length=1, max_length=300)
     url: str
-    location: Optional[str] = None
+    location: str | None = None
     remote_type: RemoteType = RemoteType.UNKNOWN
-    salary_min: Optional[float] = Field(default=None, ge=0)
-    salary_max: Optional[float] = Field(default=None, ge=0)
+    salary_min: float | None = Field(default=None, ge=0)
+    salary_max: float | None = Field(default=None, ge=0)
     salary_currency: str = "USD"
-    description_raw: Optional[str] = None
-    description_clean: Optional[str] = None
-    posting_date: Optional[str] = None
-    expiry_date: Optional[str] = None
+    description_raw: str | None = None
+    description_clean: str | None = None
+    posting_date: str | None = None
+    expiry_date: str | None = None
 
     @model_validator(mode="after")
-    def salary_range_valid(self) -> "JobListingCreate":
+    def salary_range_valid(self) -> JobListingCreate:
         """Salary min must not exceed max."""
         if self.salary_min is not None and self.salary_max is not None:
             if self.salary_min > self.salary_max:
@@ -177,13 +175,13 @@ class JobListing(JobListingCreate):
     Full job listing record from the database, including computed fields.
     """
     id: int
-    company_tier: Optional[int] = Field(default=None, ge=1, le=3)
-    match_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    match_reasoning: Optional[str] = None
-    rank_model_version: Optional[str] = None
+    company_tier: int | None = Field(default=None, ge=1, le=3)
+    match_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    match_reasoning: str | None = None
+    rank_model_version: str | None = None
     status: JobStatus = JobStatus.SCRAPED
     scraped_at: datetime
-    ranked_at: Optional[datetime] = None
+    ranked_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -199,7 +197,7 @@ class JobSkillCreate(BaseModel):
     job_id: int
     skill_id: int
     is_required: bool = True
-    source_context: Optional[str] = None  # The sentence mentioning this skill
+    source_context: str | None = None  # The sentence mentioning this skill
 
 
 class JobSkill(JobSkillCreate):
@@ -215,7 +213,7 @@ class ResumeProfileCreate(BaseModel):
     """Create a resume profile for matching against jobs."""
     name: str = Field(..., min_length=1, max_length=100)
     version: str = "1.0"
-    raw_text: Optional[str] = None
+    raw_text: str | None = None
 
 
 class ResumeProfile(ResumeProfileCreate):
@@ -229,8 +227,8 @@ class ResumeSkillCreate(BaseModel):
     profile_id: int
     skill_id: int
     proficiency: Proficiency
-    years_experience: Optional[float] = Field(default=None, ge=0)
-    evidence: Optional[str] = None  # e.g., "Saved $12M identifying firmware defects"
+    years_experience: float | None = Field(default=None, ge=0)
+    evidence: str | None = None  # e.g., "Saved $12M identifying firmware defects"
 
 
 class ResumeSkill(ResumeSkillCreate):
@@ -250,8 +248,8 @@ class ScrapeLogCreate(BaseModel):
     jobs_new: int = Field(default=0, ge=0)
     jobs_duplicate: int = Field(default=0, ge=0)
     errors: int = Field(default=0, ge=0)
-    error_details: Optional[str] = None  # JSON array
-    duration_seconds: Optional[float] = Field(default=None, ge=0)
+    error_details: str | None = None  # JSON array
+    duration_seconds: float | None = Field(default=None, ge=0)
 
 
 class ScrapeLog(ScrapeLogCreate):

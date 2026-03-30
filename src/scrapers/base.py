@@ -37,16 +37,15 @@ import random
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional
 
 import aiohttp
+import structlog
 from tenacity import (
     retry,
     retry_if_exception_type,
     stop_after_attempt,
     wait_exponential_jitter,
 )
-import structlog
 
 from src.models.entities import RawJobListing
 
@@ -140,7 +139,7 @@ class ScraperError(Exception):
 class RateLimitError(ScraperError):
     """Raised when we receive HTTP 429 Too Many Requests."""
 
-    def __init__(self, retry_after: Optional[int] = None):
+    def __init__(self, retry_after: int | None = None):
         self.retry_after = retry_after
         super().__init__(
             f"Rate limited. Retry after: {retry_after}s"
@@ -199,14 +198,14 @@ class BaseScraper(ABC):
         self.timeout_seconds = timeout_seconds
 
         self._semaphore = asyncio.Semaphore(concurrency)
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
         self._metrics = ScrapeMetrics()
 
     # -------------------------------------------------------------------
     # Async Context Manager — session lifecycle
     # -------------------------------------------------------------------
 
-    async def __aenter__(self) -> "BaseScraper":
+    async def __aenter__(self) -> BaseScraper:
         """
         Create the aiohttp session with connection pooling.
 
@@ -264,8 +263,8 @@ class BaseScraper(ABC):
     async def fetch(
         self,
         url: str,
-        params: Optional[dict] = None,
-        headers: Optional[dict] = None,
+        params: dict | None = None,
+        headers: dict | None = None,
     ) -> str:
         """
         Fetch a URL with rate limiting, retries, and metrics.
@@ -302,8 +301,8 @@ class BaseScraper(ABC):
     async def _fetch_with_retry(
         self,
         url: str,
-        params: Optional[dict] = None,
-        headers: Optional[dict] = None,
+        params: dict | None = None,
+        headers: dict | None = None,
     ) -> str:
         """
         Internal fetch with tenacity retry decorator.
@@ -405,7 +404,7 @@ class BaseScraper(ABC):
         ...
 
     @abstractmethod
-    def parse_listing(self, raw_html: str) -> Optional[RawJobListing]:
+    def parse_listing(self, raw_html: str) -> RawJobListing | None:
         """
         Parse a single job listing from raw HTML/JSON.
 
@@ -426,7 +425,7 @@ class BaseScraper(ABC):
     async def fetch_many(
         self,
         urls: list[str],
-        params: Optional[dict] = None,
+        params: dict | None = None,
     ) -> list[tuple[str, str]]:
         """
         Fetch multiple URLs concurrently (respecting the semaphore).

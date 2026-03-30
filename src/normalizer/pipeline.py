@@ -22,10 +22,9 @@ reason about in a pipeline that otherwise has async I/O everywhere."
 from __future__ import annotations
 
 import re
-from typing import Optional
 
-from bs4 import BeautifulSoup
 import structlog
+from bs4 import BeautifulSoup
 
 from src.models.entities import (
     JobListingCreate,
@@ -57,7 +56,7 @@ _SALARY_RANGE_PATTERN = re.compile(
 )
 
 
-def parse_salary(text: Optional[str]) -> tuple[Optional[float], Optional[float]]:
+def parse_salary(text: str | None) -> tuple[float | None, float | None]:
     """
     Parse salary text into (min, max) floats.
 
@@ -92,10 +91,10 @@ def parse_salary(text: Optional[str]) -> tuple[Optional[float], Optional[float]]
 
 
 def _parse_salary_number(
-    main_digits: Optional[str],
-    trailing_digits: Optional[str],
+    main_digits: str | None,
+    trailing_digits: str | None,
     original_text: str,
-) -> Optional[float]:
+) -> float | None:
     """Convert matched digits into a salary float."""
     if not main_digits:
         return None
@@ -120,7 +119,7 @@ def _parse_salary_number(
 # HTML Cleaning
 # ---------------------------------------------------------------------------
 
-def clean_html(raw_html: Optional[str]) -> Optional[str]:
+def clean_html(raw_html: str | None) -> str | None:
     """
     Strip HTML tags and normalize whitespace from job descriptions.
 
@@ -218,7 +217,7 @@ _COMPILED_SKILLS: list[tuple[str, list[re.Pattern]]] = [
 ]
 
 
-def extract_skills(text: Optional[str]) -> list[dict]:
+def extract_skills(text: str | None) -> list[dict]:
     """
     Extract mentioned skills from job description text.
 
@@ -239,7 +238,7 @@ def extract_skills(text: Optional[str]) -> list[dict]:
     seen: set[str] = set()
 
     # Split into sections to detect required vs nice-to-have
-    text_lower = text.lower()
+    text.lower()
     is_nice_to_have_section = False
 
     # Process line by line to track section context

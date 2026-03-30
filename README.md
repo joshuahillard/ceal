@@ -1,5 +1,7 @@
 # Céal
 
+[![CI](https://github.com/joshuahillard/ceal/actions/workflows/ci.yml/badge.svg)](https://github.com/joshuahillard/ceal/actions/workflows/ci.yml)
+
 **An event-driven career signal engine that scrapes, normalizes, and ranks job listings against your resume using LLM-powered matching.**
 
 Céal (pronounced "KAYL") is a three-stage async pipeline that processes job listings from multiple sources, extracts structured data, and scores each listing against your resume profile using Claude's API. The name blends Cape Verdean *céu* (sky) and Irish *Cael* (heavens) — two cultures, same sky.

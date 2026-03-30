@@ -20,25 +20,19 @@ Test categories:
 
 from __future__ import annotations
 
-import asyncio
 import re
 from pathlib import Path
 
-import aiohttp
 import pytest
-import pytest_asyncio
 from aioresponses import aioresponses
 
 from src.models.entities import JobSource, RemoteType
 from src.scrapers.base import (
-    BaseScraper,
     BlockedError,
     RateLimitError,
     ScrapeMetrics,
 )
 from src.scrapers.linkedin import (
-    DETAIL_URL,
-    SEARCH_URL,
     LinkedInScraper,
 )
 

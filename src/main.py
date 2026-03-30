@@ -48,21 +48,16 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import json
 import os
-import sys
 import time
-from typing import Optional
 
 import structlog
 
 from src.models.database import (
     assign_company_tiers,
-    create_resume_profile,
     get_pipeline_stats,
     get_top_matches,
     init_db,
-    link_resume_skill,
     log_scrape_run,
     upsert_jobs_batch,
 )
@@ -72,7 +67,7 @@ from src.models.entities import (
     RawJobListing,
     ScrapeLogCreate,
 )
-from src.normalizer.pipeline import normalize_job, extract_skills
+from src.normalizer.pipeline import normalize_job
 from src.ranker.llm_ranker import LLMRanker
 from src.scrapers.linkedin import LinkedInScraper
 
@@ -141,7 +136,6 @@ async def scraper_stage(
                 await raw_queue.put(job)
 
             # Log scrape metrics
-            metrics = scraper.metrics
 
     except Exception as exc:
         scrape_stats["errors"] = 1
@@ -223,7 +217,7 @@ async def normalizer_stage(
 
     # Batch insert all normalized jobs
     if all_jobs:
-        stats = await upsert_jobs_batch(all_jobs)
+        await upsert_jobs_batch(all_jobs)
 
         # Auto-assign company tiers
         await assign_company_tiers()
@@ -247,7 +241,7 @@ async def normalizer_stage(
 async def ranker_stage(
     clean_queue: asyncio.Queue,
     resume_text: str,
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
 ) -> None:
     """
     Stage 3: CONSUMER — scores jobs against the resume via LLM.
@@ -336,9 +330,9 @@ async def run_pipeline(
     query: str,
     location: str,
     max_results: int = 100,
-    resume_text: Optional[str] = None,
+    resume_text: str | None = None,
     rank: bool = True,
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
 ) -> dict:
     """
     Run the full three-stage pipeline.
@@ -408,8 +402,8 @@ async def run_pipeline(
 
 
 async def run_rank_only(
-    resume_text: Optional[str] = None,
-    api_key: Optional[str] = None,
+    resume_text: str | None = None,
+    api_key: str | None = None,
     limit: int = 50,
 ) -> dict:
     """

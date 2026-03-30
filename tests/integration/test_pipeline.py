@@ -16,23 +16,21 @@ from __future__ import annotations
 
 import os
 import re
+from pathlib import Path
 
 import pytest
 import pytest_asyncio
 from aioresponses import aioresponses
-from pathlib import Path
 
 # Override DB before imports
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite://"
 
+from src.main import run_pipeline
 from src.models.database import (
     engine,
-    get_pipeline_stats,
     get_unranked_jobs,
     init_db,
 )
-from src.main import run_pipeline
-
 
 MOCK_DIR = Path(__file__).parent.parent / "mocks"
 SEARCH_PATTERN = re.compile(
@@ -105,7 +103,7 @@ class TestFullPipeline:
         with aioresponses() as mock_aio:
             mock_aio.get(SEARCH_PATTERN, body="<html></html>", status=200)
 
-            stats = await run_pipeline(
+            await run_pipeline(
                 query="Nonexistent Role",
                 location="Nowhere",
                 max_results=10,
@@ -160,8 +158,9 @@ class TestFullPipeline:
                 rank=False,
             )
 
-        from src.models.database import get_session
         from sqlalchemy import text
+
+        from src.models.database import get_session
 
         async with get_session() as session:
             result = await session.execute(

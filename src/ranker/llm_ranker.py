@@ -31,7 +31,6 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Optional
 
 import httpx
 import structlog
@@ -118,16 +117,16 @@ class LLMRanker:
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         model: str = DEFAULT_MODEL,
         max_tokens: int = DEFAULT_MAX_TOKENS,
     ):
         self.api_key = api_key or os.getenv("LLM_API_KEY", "")
         self.model = model
         self.max_tokens = max_tokens
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
 
-    async def __aenter__(self) -> "LLMRanker":
+    async def __aenter__(self) -> LLMRanker:
         self._client = httpx.AsyncClient(
             timeout=60.0,
             headers={
@@ -149,9 +148,9 @@ class LLMRanker:
         company_name: str,
         job_description: str,
         resume_text: str,
-        location: Optional[str] = None,
-        required_skills: Optional[list[str]] = None,
-        nice_to_have_skills: Optional[list[str]] = None,
+        location: str | None = None,
+        required_skills: list[str] | None = None,
+        nice_to_have_skills: list[str] | None = None,
     ) -> RankedResult:
         """
         Score a single job listing against the resume.
@@ -237,7 +236,7 @@ class LLMRanker:
         if cleaned.startswith("```"):
             # Remove ```json\n...\n```
             lines = cleaned.split("\n")
-            lines = [l for l in lines if not l.strip().startswith("```")]
+            lines = [line for line in lines if not line.strip().startswith("```")]
             cleaned = "\n".join(lines)
 
         try:
@@ -265,7 +264,7 @@ class LLMRanker:
 
 async def rank_unranked_jobs(
     resume_text: str,
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
     limit: int = 20,
 ) -> list[RankedResult]:
     """

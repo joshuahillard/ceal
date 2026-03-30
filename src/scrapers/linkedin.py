@@ -28,11 +28,9 @@ migrating to an official API is a single-class swap."
 from __future__ import annotations
 
 import re
-from typing import Optional
-from urllib.parse import quote_plus
 
-from bs4 import BeautifulSoup
 import structlog
+from bs4 import BeautifulSoup
 
 from src.models.entities import JobSource, RawJobListing, RemoteType
 from src.scrapers.base import BaseScraper, BlockedError, RateLimitError
@@ -238,7 +236,7 @@ class LinkedInScraper(BaseScraper):
     # Single listing parser (implements abstract method)
     # -------------------------------------------------------------------
 
-    def parse_listing(self, raw_html: str) -> Optional[RawJobListing]:
+    def parse_listing(self, raw_html: str) -> RawJobListing | None:
         """
         Parse a single LinkedIn job card HTML into a RawJobListing.
 
@@ -305,7 +303,7 @@ class LinkedInScraper(BaseScraper):
 
         # Posted date
         date_elem = soup.find("time")
-        posted_date = date_elem.get("datetime", "") if date_elem else None
+        date_elem.get("datetime", "") if date_elem else None
 
         return RawJobListing(
             external_id=job_id,
@@ -364,7 +362,7 @@ class LinkedInScraper(BaseScraper):
 
         return enriched
 
-    def _extract_description(self, html: str) -> Optional[str]:
+    def _extract_description(self, html: str) -> str | None:
         """
         Extract the job description text from a LinkedIn job detail page.
 
@@ -390,8 +388,8 @@ class LinkedInScraper(BaseScraper):
 
     @staticmethod
     def _detect_remote_type(
-        title: Optional[str],
-        location: Optional[str],
+        title: str | None,
+        location: str | None,
     ) -> RemoteType:
         """
         Detect remote/hybrid/onsite from title and location strings.

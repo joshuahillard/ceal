@@ -14,17 +14,14 @@ separated it from the database writes — testability."
 
 from __future__ import annotations
 
-import pytest
-
 from src.models.entities import JobSource, RawJobListing, RemoteType
 from src.normalizer.pipeline import (
     clean_html,
     extract_skills,
-    normalize_job,
     normalize_batch,
+    normalize_job,
     parse_salary,
 )
-
 
 # ---------------------------------------------------------------------------
 # Salary Parsing Tests
