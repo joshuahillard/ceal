@@ -1,0 +1,56 @@
+# ---------------------------------------------------------------------------
+# Céal — Project Configuration
+# ---------------------------------------------------------------------------
+# Centralizes tool config (ruff, pytest, coverage) in one file.
+# No build system section needed yet — we use requirements.txt for deps.
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# Default rule set (Pyflakes + pycodestyle errors) plus a few extras
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "W",    # pycodestyle warnings
+    "I",    # isort (import ordering)
+    "UP",   # pyupgrade (modern Python idioms)
+    "B",    # flake8-bugbear (common bugs)
+    "SIM",  # flake8-simplify
+]
+ignore = [
+    "E501",   # line-too-long — handled by formatter, not linter
+    "SIM102", # nested-if — readability preference for validation guards
+    "SIM105", # suppressible-exception — explicit try/except is clearer for async
+    "SIM108", # ternary operator — readability preference
+    "UP042",  # StrEnum — requires Python 3.11+, keep str+Enum for 3.10 compat
+    "B017",   # assert-blind-exception — intentional in tests (Pydantic wrapping)
+    "B904",   # raise-without-from — addressed incrementally
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+# ---------------------------------------------------------------------------
+# Pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "strict"
+addopts = "-v --tb=short"
+
+# ---------------------------------------------------------------------------
+# Coverage
+# ---------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["src"]
+omit = ["src/__init__.py"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_empty = true

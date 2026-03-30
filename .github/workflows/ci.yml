@@ -1,0 +1,155 @@
+# ---------------------------------------------------------------------------
+# Céal CI Pipeline — Lint → Test → Coverage
+# ---------------------------------------------------------------------------
+# Enforces code quality gates on every push and pull request.
+# Blocks merge if any stage fails (requires branch protection rule).
+#
+# Architecture:
+#   Stage 1 (Lint)        — ruff check, fail-fast
+#   Stage 2 (Unit Tests)  — pytest tests/unit/, depends on lint
+#   Stage 3 (Integration) — pytest tests/integration/, depends on unit
+#   Stage 4 (Coverage)    — pytest --cov, fail-under=80%, depends on unit
+#
+# Resume bullet: "Designed CI/CD pipeline with 4-stage quality gates
+#   (lint → unit → integration → coverage) enforcing zero-regression
+#   policy across 93+ tests on Python 3.11/3.12 matrix."
+# ---------------------------------------------------------------------------
+
+name: CI
+
+on:
+  push:
+    branches: [main, "feature/**", "fix/**"]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs for the same branch/PR
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # -----------------------------------------------------------------------
+  # Stage 1: Lint (fail-fast — no point running tests on dirty code)
+  # -----------------------------------------------------------------------
+  lint:
+    name: "Lint (ruff)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Run ruff check
+        run: ruff check src/ tests/
+
+  # -----------------------------------------------------------------------
+  # Stage 2: Unit Tests (depends on lint passing)
+  # -----------------------------------------------------------------------
+  unit-tests:
+    name: "Unit Tests (Python ${{ matrix.python-version }})"
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+      fail-fast: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-${{ matrix.python-version }}-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run unit tests
+        run: pytest tests/unit/ -v --tb=short
+
+  # -----------------------------------------------------------------------
+  # Stage 3: Integration Tests (depends on unit tests passing)
+  # -----------------------------------------------------------------------
+  integration-tests:
+    name: "Integration Tests (Python ${{ matrix.python-version }})"
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+      fail-fast: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-${{ matrix.python-version }}-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run integration tests
+        run: pytest tests/integration/ -v --tb=short
+
+  # -----------------------------------------------------------------------
+  # Stage 4: Coverage (runs in parallel with integration, depends on unit)
+  # -----------------------------------------------------------------------
+  coverage:
+    name: "Coverage Check"
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-3.11-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-3.11-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests with coverage
+        run: pytest tests/ --cov=src --cov-report=term-missing --cov-fail-under=80
