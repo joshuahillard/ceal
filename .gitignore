@@ -9,6 +9,7 @@ __pycache__/
 data/*.db
 data/*.db-wal
 data/*.db-shm
+data/*.db-journal
 
 # IDE
 .vscode/
@@ -24,6 +25,7 @@ logs/
 # Coverage
 htmlcov/
 .coverage
+.coverage.*
 
 # Pytest
 .pytest_cache/
