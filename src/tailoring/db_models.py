@@ -26,7 +26,7 @@ Personas tagged in:
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import datetime
 
 from sqlalchemy import (
     Boolean,
@@ -45,7 +45,6 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship,
 )
-
 
 # ---------------------------------------------------------------------------
 # Declarative Base — Phase 2 ORM root
@@ -83,9 +82,9 @@ class _ResumeProfileStub(Base):
 PHASE1_STUB_TABLES = {"job_listings", "resume_profiles"}
 
 
-def _utcnow() -> datetime:
+def _utcnow() -> datetime.datetime:
     """Timezone-aware UTC timestamp for default column values."""
-    return datetime.now(timezone.utc)
+    return datetime.datetime.now(datetime.UTC)
 
 
 # ---------------------------------------------------------------------------
@@ -131,7 +130,7 @@ class ParsedBulletTable(Base):
         Text, nullable=True, default=None,
         comment="JSON array of quantitative metrics extracted from bullet",
     )
-    created_at: Mapped[datetime] = mapped_column(
+    created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False,
     )
 
@@ -188,17 +187,17 @@ class TailoringRequestTable(Base):
         Text, nullable=True, default=None,
         comment="JSON array of emphasis keywords for LLM prompt context",
     )
-    created_at: Mapped[datetime] = mapped_column(
+    created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False,
     )
 
     # Relationships — loaded lazily by default, eager when needed
-    tailored_bullets: Mapped[list["TailoredBulletTable"]] = relationship(
+    tailored_bullets: Mapped[list[TailoredBulletTable]] = relationship(
         back_populates="request",
         cascade="all, delete-orphan",
         lazy="selectin",
     )
-    skill_gaps: Mapped[list["SkillGapTable"]] = relationship(
+    skill_gaps: Mapped[list[SkillGapTable]] = relationship(
         back_populates="request",
         cascade="all, delete-orphan",
         lazy="selectin",
@@ -256,12 +255,12 @@ class TailoredBulletTable(Base):
         ),
         nullable=False,
     )
-    created_at: Mapped[datetime] = mapped_column(
+    created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False,
     )
 
     # Back-reference to parent request
-    request: Mapped["TailoringRequestTable"] = relationship(
+    request: Mapped[TailoringRequestTable] = relationship(
         back_populates="tailored_bullets",
     )
 
@@ -320,12 +319,12 @@ class SkillGapTable(Base):
         nullable=True,
         default=None,
     )
-    created_at: Mapped[datetime] = mapped_column(
+    created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False,
     )
 
     # Back-reference to parent request
-    request: Mapped["TailoringRequestTable"] = relationship(
+    request: Mapped[TailoringRequestTable] = relationship(
         back_populates="skill_gaps",
     )
 

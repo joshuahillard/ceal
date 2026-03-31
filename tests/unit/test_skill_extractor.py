@@ -7,6 +7,8 @@ until Wednesday's implementation session.
 Persona: [QA Lead] — stub coverage, interface contract verification
 """
 
+import datetime
+
 import pytest
 
 from src.models.entities import JobListing, JobSource, JobStatus, RemoteType
@@ -15,9 +17,7 @@ from src.tailoring.skill_extractor import SkillOverlapAnalyzer
 
 def _make_test_job() -> JobListing:
     """Creates a minimal valid JobListing for testing."""
-    from datetime import datetime, timezone
-
-    now = datetime.now(timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
     return JobListing(
         id=1,
         external_id="stripe-123",

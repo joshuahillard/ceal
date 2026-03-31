@@ -18,8 +18,6 @@ Interview talking point:
 """
 from __future__ import annotations
 
-from typing import List
-
 from src.models.entities import JobListing
 from src.tailoring.models import SkillGap
 
@@ -30,7 +28,7 @@ class SkillOverlapAnalyzer:
     def __init__(self) -> None:
         pass
 
-    def analyze(self, job: JobListing, resume_skills: List[str]) -> List[SkillGap]:
+    def analyze(self, job: JobListing, resume_skills: list[str]) -> list[SkillGap]:
         """
         Calculates gap analysis enforcing SkillGap Pydantic boundaries.
 
