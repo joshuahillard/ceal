@@ -55,6 +55,7 @@ class TestDashboard:
             patch("src.web.routes.dashboard.get_pipeline_stats", new_callable=AsyncMock, return_value=mock_stats),
             patch("src.web.routes.dashboard.get_application_summary", new_callable=AsyncMock, return_value={"ranked": 5}),
             patch("src.web.routes.dashboard.get_stale_applications", new_callable=AsyncMock, return_value=[]),
+            patch("src.web.routes.dashboard.get_application_stats", new_callable=AsyncMock, return_value={}),
         ):
             response = await client.get("/")
         assert response.status_code == 200
@@ -75,6 +76,7 @@ class TestDashboard:
             patch("src.web.routes.dashboard.get_pipeline_stats", new_callable=AsyncMock, return_value=mock_stats),
             patch("src.web.routes.dashboard.get_application_summary", new_callable=AsyncMock, return_value={}),
             patch("src.web.routes.dashboard.get_stale_applications", new_callable=AsyncMock, return_value=[]),
+            patch("src.web.routes.dashboard.get_application_stats", new_callable=AsyncMock, return_value={}),
         ):
             response = await client.get("/")
         assert response.status_code == 200

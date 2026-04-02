@@ -230,3 +230,96 @@ a { color: var(--primary); }
     border-radius: 10px;
     margin-left: 0.3rem;
 }
+
+/* Phase 4: Auto-Apply styles */
+
+/* Confidence bar */
+.confidence-bar-wrap {
+    display: inline-block;
+    width: 80px;
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    vertical-align: middle;
+}
+.confidence-bar {
+    display: block;
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s;
+}
+.confidence-high { background: var(--green); }
+.confidence-med { background: var(--yellow); }
+.confidence-low { background: var(--red); }
+
+/* Confidence dot (for field table) */
+.confidence-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    vertical-align: middle;
+    margin-right: 0.3rem;
+}
+
+/* Source badges */
+.source-badge {
+    display: inline-block;
+    padding: 0.1em 0.5em;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+.source-resume { background: #d1e7dd; color: #0f5132; }
+.source-profile { background: #cff4fc; color: #055160; }
+.source-tailored { background: #e2d9f3; color: #432874; }
+.source-manual { background: #e2e3e5; color: #41464b; }
+.source-ai_generated { background: #fff3cd; color: #664d03; }
+
+/* Status tabs */
+.status-tabs {
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 0;
+}
+.status-tab {
+    padding: 0.5rem 1rem;
+    text-decoration: none;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.85rem;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+}
+.status-tab:hover { color: var(--text); }
+.status-tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+/* Queue grid */
+.queue-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+}
+
+/* Review field row */
+.review-field td { vertical-align: middle; }
+
+/* Pre-fill button */
+.prefill-btn {
+    background: var(--green);
+    color: #fff;
+    border: none;
+    padding: 0.2rem 0.6rem;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+.prefill-btn:hover { background: #157347; }

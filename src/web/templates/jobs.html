@@ -39,6 +39,7 @@
             <th>Location</th>
             <th>Remote</th>
             <th>Status</th>
+            <th>Apply</th>
         </tr>
     </thead>
     <tbody>
@@ -62,6 +63,11 @@
             <td>{{ job.location or "—" }}</td>
             <td>{{ job.remote_type or "—" }}</td>
             <td>{{ job.status }}</td>
+            <td>
+                <form method="post" action="/apply/prefill/{{ job.id }}" style="display:inline">
+                    <button type="submit" class="prefill-btn">Pre-Fill</button>
+                </form>
+            </td>
         </tr>
         {% endfor %}
     </tbody>

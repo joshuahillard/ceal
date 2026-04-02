@@ -79,6 +79,24 @@
     </div>
 
     <div class="card">
+        <h3>Auto-Apply Pipeline</h3>
+        {% if apply_stats %}
+        <table class="table-compact">
+            {% for status, count in apply_stats.items() %}
+            <tr>
+                <td>{{ status | title }}</td>
+                <td class="text-right"><strong>{{ count }}</strong></td>
+            </tr>
+            {% endfor %}
+        </table>
+        <p style="margin-top: 0.75rem;"><a href="/apply">View Approval Queue &rarr;</a></p>
+        {% else %}
+        <p class="muted">No auto-apply drafts yet.</p>
+        <p style="margin-top: 0.5rem;"><a href="/jobs">Pre-fill from Jobs &rarr;</a></p>
+        {% endif %}
+    </div>
+
+    <div class="card">
         <h3>Follow-Up Reminders</h3>
         {% if stale_count > 0 %}
         <div class="stat-large" style="color: var(--red);">{{ stale_count }}</div>

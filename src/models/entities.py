@@ -262,6 +262,90 @@ class ScrapeLog(ScrapeLogCreate):
 # Ranked Job — what the ranker stage outputs
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Phase 4: Auto-Apply Enums + Models
+# ---------------------------------------------------------------------------
+
+
+class ApplicationStatus(str, Enum):
+    """Status lifecycle for auto-apply applications."""
+    DRAFT = "draft"
+    READY = "ready"
+    APPROVED = "approved"
+    SUBMITTED = "submitted"
+    WITHDRAWN = "withdrawn"
+
+
+class FieldType(str, Enum):
+    """Common ATS form field types."""
+    TEXT = "text"
+    TEXTAREA = "textarea"
+    SELECT = "select"
+    CHECKBOX = "checkbox"
+    RADIO = "radio"
+    FILE = "file"
+    DATE = "date"
+    EMAIL = "email"
+    PHONE = "phone"
+    URL = "url"
+
+
+class FieldSource(str, Enum):
+    """Where the pre-filled value came from."""
+    RESUME = "resume"
+    PROFILE = "profile"
+    TAILORED = "tailored"
+    MANUAL = "manual"
+    AI_GENERATED = "ai_generated"
+
+
+class ApplicationFieldCreate(BaseModel):
+    """A single pre-filled form field."""
+    field_name: str = Field(..., min_length=1, max_length=200)
+    field_type: FieldType = FieldType.TEXT
+    field_value: str | None = None
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    source: FieldSource | None = None
+
+
+class ApplicationCreate(BaseModel):
+    """Create a new auto-apply application draft."""
+    job_id: int
+    profile_id: int = 1
+    cover_letter: str | None = None
+    confidence_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    fields: list[ApplicationFieldCreate] = Field(default_factory=list)
+    notes: str | None = None
+
+
+class Application(BaseModel):
+    """Full application record from database."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    job_id: int
+    profile_id: int
+    status: ApplicationStatus
+    cover_letter: str | None = None
+    confidence_score: float | None = None
+    notes: str | None = None
+    created_at: str
+    updated_at: str
+    submitted_at: str | None = None
+    fields: list[ApplicationFieldCreate] = Field(default_factory=list)
+
+    # Joined fields from job_listings (populated by queries)
+    job_title: str | None = None
+    company_name: str | None = None
+    company_tier: int | None = None
+    match_score: float | None = None
+    url: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Ranked Job — what the ranker stage outputs
+# ---------------------------------------------------------------------------
+
 class RankedResult(BaseModel):
     """
     The LLM ranker's output for a single job.
