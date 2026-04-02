@@ -1,0 +1,18 @@
+Technical Solutions Engineer - Stripe
+
+About the role:
+We're looking for a Technical Solutions Engineer to help our largest users build and scale their payments infrastructure. You'll work directly with engineering teams to debug complex API integrations, design solutions for payment flows, and serve as the technical voice of the customer.
+
+Requirements:
+- 3+ years of experience in a technical support, solutions engineering, or similar customer-facing technical role
+- Strong debugging and troubleshooting skills, including reading logs and API traces
+- Experience with REST APIs, webhooks, and payment processing systems
+- Proficiency in at least one programming language (Python, Ruby, Java, or JavaScript)
+- Familiarity with SQL databases and data analysis
+- Excellent written and verbal communication skills
+
+Nice to have:
+- Experience with financial technology or payment processing
+- Familiarity with cloud infrastructure (AWS, GCP, or Azure)
+- Experience managing technical escalations
+- Background in SaaS platforms

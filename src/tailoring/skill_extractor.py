@@ -18,8 +18,40 @@ Interview talking point:
 """
 from __future__ import annotations
 
-from src.models.entities import JobListing
+from src.models.entities import JobListing, Proficiency, SkillCategory
 from src.tailoring.models import SkillGap
+
+# ---------------------------------------------------------------------------
+# Skill category mappings for common job description terms
+# ---------------------------------------------------------------------------
+
+_SKILL_CATEGORIES: dict[str, tuple[str, SkillCategory]] = {
+    "python": ("Python", SkillCategory.LANGUAGE),
+    "javascript": ("JavaScript", SkillCategory.LANGUAGE),
+    "java": ("Java", SkillCategory.LANGUAGE),
+    "ruby": ("Ruby", SkillCategory.LANGUAGE),
+    "sql": ("SQL", SkillCategory.DATABASE),
+    "rest apis": ("REST APIs", SkillCategory.TOOL),
+    "webhooks": ("Webhooks", SkillCategory.TOOL),
+    "debugging": ("Debugging", SkillCategory.METHODOLOGY),
+    "troubleshooting": ("Troubleshooting", SkillCategory.METHODOLOGY),
+    "payment processing": ("Payment Processing", SkillCategory.DOMAIN),
+    "financial technology": ("FinTech", SkillCategory.DOMAIN),
+    "fintech": ("FinTech", SkillCategory.DOMAIN),
+    "cloud infrastructure": ("Cloud Infrastructure", SkillCategory.INFRASTRUCTURE),
+    "aws": ("AWS", SkillCategory.CLOUD),
+    "gcp": ("GCP", SkillCategory.CLOUD),
+    "azure": ("Azure", SkillCategory.CLOUD),
+    "communication": ("Communication", SkillCategory.SOFT_SKILL),
+    "data analysis": ("Data Analysis", SkillCategory.METHODOLOGY),
+    "saas": ("SaaS", SkillCategory.DOMAIN),
+    "docker": ("Docker", SkillCategory.INFRASTRUCTURE),
+    "linux": ("Linux", SkillCategory.INFRASTRUCTURE),
+    "git": ("Git", SkillCategory.TOOL),
+    "technical escalations": ("Technical Escalations", SkillCategory.SOFT_SKILL),
+    "project management": ("Project Management", SkillCategory.METHODOLOGY),
+    "api integrations": ("API Integrations", SkillCategory.TOOL),
+}
 
 
 class SkillOverlapAnalyzer:
@@ -40,10 +72,45 @@ class SkillOverlapAnalyzer:
             List of SkillGap models — one per skill in the job listing,
             with resume_has and proficiency mapped where applicable.
         """
-        # TODO: Implement overlap and gap flag logic
-        # Implementation plan (Wed 4/1):
-        #   1. Extract required skills from job.description_clean
-        #   2. Cross-reference against resume_skills (fuzzy + exact match)
-        #   3. Map proficiency levels from resume_profiles_skills table
-        #   4. Return SkillGap list with conservative gap flagging
-        raise NotImplementedError("Stub implementation — scheduled for Wed 4/1")
+        job_skills = self._extract_job_skills(
+            job.description_clean or job.description_raw or ""
+        )
+        resume_lower = {s.lower().strip() for s in resume_skills}
+
+        gaps: list[SkillGap] = []
+        seen: set[str] = set()
+
+        for skill_name, category in job_skills:
+            key = skill_name.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+
+            has_skill = any(
+                key in r or r in key for r in resume_lower
+            )
+
+            gaps.append(SkillGap(
+                skill_name=skill_name,
+                category=category,
+                job_requires=True,
+                resume_has=has_skill,
+                proficiency=Proficiency.PROFICIENT if has_skill else None,
+            ))
+
+        return gaps
+
+    def _extract_job_skills(
+        self, description: str,
+    ) -> list[tuple[str, SkillCategory]]:
+        """Extract skill phrases from job description text."""
+        found: list[tuple[str, SkillCategory]] = []
+        desc_lower = description.lower()
+        seen: set[str] = set()
+
+        for keyword, (display_name, category) in _SKILL_CATEGORIES.items():
+            if keyword in desc_lower and display_name.lower() not in seen:
+                seen.add(display_name.lower())
+                found.append((display_name, category))
+
+        return found

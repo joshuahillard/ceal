@@ -553,8 +553,31 @@ async def _async_main() -> None:
         type=int,
         help="Show top N matches after pipeline completes",
     )
+    parser.add_argument(
+        "--demo",
+        action="store_true",
+        help="Run demo mode: single-job tailoring without DB or scraping",
+    )
+    parser.add_argument(
+        "--resume",
+        type=str,
+        help="Path to resume text file (used with --demo)",
+    )
+    parser.add_argument(
+        "--job",
+        type=str,
+        help="Path to job description text file (used with --demo)",
+    )
 
     args = parser.parse_args()
+
+    # Demo mode — separate pipeline, no DB needed
+    if args.demo:
+        if not args.resume or not args.job:
+            parser.error("--demo requires both --resume and --job")
+        from src.demo import run_demo
+        await run_demo(resume_path=args.resume, job_path=args.job)
+        return
 
     if args.rank_only:
         stats = await run_rank_only()

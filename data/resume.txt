@@ -1,0 +1,48 @@
+PROFESSIONAL SUMMARY
+Experienced technical leader with 10+ years in tech, including 6+ years at Toast (NYSE: TOST) managing technical escalation teams and driving cross-functional solutions. Builder of production autonomous systems and AI-powered data pipelines. Demonstrated ability to save $12 million by identifying critical firmware defects. Currently building cloud-native Python applications with async architectures, AI/LLM integrations, and CI/CD automation.
+
+EXPERIENCE
+Toast, Inc. — Manager II, Technical Escalations (Oct 2023 – Oct 2025)
+- Directed and mentored team of senior technical consultants handling complex POS system escalations
+- Saved Toast estimated $12 million by identifying critical firmware defects on handheld POS devices
+- Recognized by CEO Chris Comparato at company-wide kickoff event for defect identification impact
+- Featured in Toast marketing materials as subject matter expert
+- Reduced recurring issue volume by 37% via cross-functional collaboration with Product and Engineering teams
+- Created enablement materials, onboarding frameworks, and knowledge base articles for technical teams
+- Managed escalation workflows across Engineering, Product, and Customer Success organizations
+
+Toast, Inc. — Senior Restaurant Technical Consultant II (Jun 2022 – Sep 2023)
+- Achieved 63% successful post-sales adoption rate partnering with Customer Success Managers
+- Created consultative playbooks and training frameworks for technical onboarding
+- Served as primary Technical SME for on-site implementations and cross-team technical initiatives
+- Delivered API integration guidance for restaurant technology ecosystem partners
+
+Toast, Inc. — Senior Customer Care Representative, Payment Escalations (Apr 2019 – Jun 2022)
+- Managed complex payment processing escalation workflows for enterprise restaurant clients
+- Drove customer feedback analysis leading to operational enhancements across support organization
+- Built foundation for technical leadership through deep domain expertise in FinTech payment systems
+
+PROJECTS
+Sol-Fortress / Moss Lane — Autonomous Trading System (March 2026 – Present)
+- Built production autonomous trading system deployed on cloud infrastructure (Vultr VPS, Ubuntu Linux)
+- Executed full lifecycle: audit, root cause analysis, 1,800-line rewrite, automated deployment with rollback
+- Integrated 5 external REST APIs with multi-layer risk management framework and SQLite database
+- Orchestrated AI-driven development using Claude and Gemini for systematic code generation
+- Demonstrated: Python, Linux administration, SSH/SCP, systemd services, SQL, REST APIs, deployment automation
+
+Ceal — AI-Powered Career Signal Engine (March 2026 – Present)
+- Designed event-driven async pipeline processing 500+ job listings in 8 seconds (95% reduction from sync baseline)
+- Enforced Pydantic v2 data contracts at every pipeline boundary achieving 0% corrupt database records
+- Built Claude API integration for deterministic LLM scoring with prompt versioning for A/B testing
+- Implemented GitHub Actions CI/CD with 4-stage quality gates (lint, unit test, integration test, coverage)
+- Stack: Python, asyncio, SQLAlchemy 2.0, aiosqlite, Pydantic v2, httpx, structlog, pytest (183+ tests)
+
+SKILLS
+- Leadership: Escalation Management, Cross-Functional Leadership, Process Optimization, Project Management, Training & Enablement
+- Technical: Python, SQL, REST APIs, API Integrations, Git, Payment Processing, Pydantic, SQLAlchemy, asyncio
+- Infrastructure: Linux, Docker, systemd, Deployment Automation, GCP, SSH/SCP
+- Domain: FinTech, SaaS, Data Engineering, Machine Learning
+
+CERTIFICATIONS
+- Google AI Essentials — Professional Certificate (2026)
+- Google Project Management — Professional Certificate (In Progress, 3/7 courses)
