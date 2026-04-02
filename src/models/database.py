@@ -625,3 +625,128 @@ async def get_pipeline_stats() -> dict:
             "total_ranked": score_row[1] if score_row else 0,
             "latest_scrape": dict(latest_scrape._mapping) if latest_scrape else None,
         }
+
+
+# ---------------------------------------------------------------------------
+# CRM: Application Status Tracking
+# ---------------------------------------------------------------------------
+
+# State machine: only valid forward transitions allowed.
+# This prevents data corruption (e.g., scraped → offer skips the entire process).
+VALID_TRANSITIONS: dict[str, set[str]] = {
+    "scraped": {"ranked", "archived"},
+    "ranked": {"applied", "archived"},
+    "applied": {"responded", "interviewing", "rejected", "archived"},
+    "responded": {"interviewing", "rejected", "archived"},
+    "interviewing": {"offer", "rejected", "archived"},
+    "offer": {"archived"},
+    "rejected": {"archived"},
+    "archived": set(),  # Terminal state
+}
+
+
+async def update_job_status(job_id: int, new_status: str, notes: str | None = None) -> dict:
+    """
+    Transition a job to a new status with state-machine validation.
+
+    Returns the updated job dict or raises ValueError for invalid transitions.
+    """
+    async with get_session() as session:
+        result = await session.execute(
+            text("SELECT id, status, title, company_name FROM job_listings WHERE id = :job_id"),
+            {"job_id": job_id},
+        )
+        job = result.first()
+        if not job:
+            raise ValueError(f"Job {job_id} not found")
+
+        current_status = job[1]
+        valid_next = VALID_TRANSITIONS.get(current_status, set())
+
+        if new_status not in valid_next:
+            raise ValueError(
+                f"Invalid transition: {current_status} → {new_status}. "
+                f"Valid transitions from '{current_status}': {valid_next or 'none (terminal state)'}"
+            )
+
+        await session.execute(
+            text("""
+                UPDATE job_listings
+                SET status = :new_status
+                WHERE id = :job_id
+            """),
+            {"new_status": new_status, "job_id": job_id},
+        )
+
+    logger.info("job_status_updated", job_id=job_id, from_status=current_status, to_status=new_status)
+    return {"job_id": job_id, "previous_status": current_status, "new_status": new_status}
+
+
+async def get_jobs_by_status(status: str, limit: int = 100) -> list[dict]:
+    """Get all jobs with a specific status, ordered by match_score descending."""
+    async with get_session() as session:
+        result = await session.execute(
+            text("""
+                SELECT id, title, company_name, company_tier, match_score,
+                       match_reasoning, url, location, remote_type,
+                       salary_min, salary_max, status, updated_at
+                FROM job_listings
+                WHERE status = :status
+                ORDER BY
+                    CASE WHEN match_score IS NOT NULL THEN match_score ELSE 0 END DESC,
+                    company_tier ASC NULLS LAST
+                LIMIT :limit
+            """),
+            {"status": status, "limit": limit},
+        )
+        return [dict(row._mapping) for row in result]
+
+
+async def get_application_summary() -> dict:
+    """
+    Get counts for each status in the application lifecycle.
+    Powers the CRM Kanban board columns.
+    """
+    async with get_session() as session:
+        result = await session.execute(
+            text("""
+                SELECT status, COUNT(*) as count
+                FROM job_listings
+                GROUP BY status
+                ORDER BY CASE status
+                    WHEN 'scraped' THEN 1
+                    WHEN 'ranked' THEN 2
+                    WHEN 'applied' THEN 3
+                    WHEN 'responded' THEN 4
+                    WHEN 'interviewing' THEN 5
+                    WHEN 'offer' THEN 6
+                    WHEN 'rejected' THEN 7
+                    WHEN 'archived' THEN 8
+                END
+            """)
+        )
+        return {row[0]: row[1] for row in result}
+
+
+async def get_stale_applications(days: int = 7) -> list[dict]:
+    """
+    Find applications that haven't been updated in N days.
+    Powers the follow-up reminder system.
+
+    Only flags jobs in active states (applied, responded, interviewing) —
+    not scraped/ranked (pre-application) or terminal states (offer/rejected/archived).
+    """
+    async with get_session() as session:
+        result = await session.execute(
+            text("""
+                SELECT id, title, company_name, company_tier, match_score,
+                       status, updated_at,
+                       CAST(julianday('now') - julianday(updated_at) AS INTEGER) as days_stale
+                FROM job_listings
+                WHERE status IN ('applied', 'responded', 'interviewing')
+                  AND julianday('now') - julianday(updated_at) >= :days
+                ORDER BY updated_at ASC
+            """),
+            {"days": days},
+        )
+        return [dict(row._mapping) for row in result]

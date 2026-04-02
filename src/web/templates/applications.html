@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Applications — Céal{% endblock %}
+
+{% block content %}
+<h1>Application Tracker</h1>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+<div class="summary-bar">
+    {% for status in ["scraped", "ranked", "applied", "responded", "interviewing", "offer", "rejected", "archived"] %}
+    <span class="summary-item">
+        <strong>{{ summary.get(status, 0) }}</strong> {{ status }}
+    </span>
+    {% endfor %}
+</div>
+
+<div class="kanban-board">
+    {% for status in ["ranked", "applied", "responded", "interviewing", "offer", "rejected"] %}
+    <div class="kanban-column">
+        <div class="kanban-column-header">
+            <span>{{ status | title }}</span>
+            <span class="badge">{{ columns.get(status, []) | length }}</span>
+        </div>
+        {% for job in columns.get(status, []) %}
+        <div class="kanban-card {% if job.company_tier == 1 %}tier-1-accent{% elif job.company_tier == 2 %}tier-2-accent{% elif job.company_tier == 3 %}tier-3-accent{% endif %}">
+            <div class="kanban-card-company">{{ job.company_name }}</div>
+            <div class="kanban-card-title">{{ job.title }}</div>
+            <div class="kanban-card-meta">
+                {% if job.match_score %}
+                <span class="badge {% if (job.match_score * 100) | round | int >= 70 %}badge-green{% elif (job.match_score * 100) | round | int >= 50 %}badge-yellow{% else %}badge-red{% endif %}">
+                    {{ (job.match_score * 100) | round | int }}%
+                </span>
+                {% endif %}
+                {% if job.company_tier %}
+                <span class="badge">T{{ job.company_tier }}</span>
+                {% endif %}
+                {% if job.updated_at %}
+                <span class="muted" style="font-size: 0.75rem;">{{ job.updated_at }}</span>
+                {% endif %}
+            </div>
+            <div class="kanban-card-actions">
+                {% set transitions = {
+                    "ranked": ["applied", "archived"],
+                    "applied": ["responded", "interviewing", "rejected", "archived"],
+                    "responded": ["interviewing", "rejected", "archived"],
+                    "interviewing": ["offer", "rejected", "archived"],
+                    "offer": ["archived"],
+                    "rejected": ["archived"]
+                } %}
+                {% for next_status in transitions.get(status, []) %}
+                <form method="post" action="/applications/{{ job.id }}/status" style="display: inline;">
+                    <input type="hidden" name="new_status" value="{{ next_status }}">
+                    <button type="submit" class="status-btn {% if next_status == 'archived' %}status-btn-muted{% endif %}">{{ next_status | title }}</button>
+                </form>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div class="kanban-empty muted">No jobs</div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+</div>
+
+{% if stale_count > 0 %}
+<div class="stale-warning" style="margin-top: 2rem;">
+    <strong>{{ stale_count }} application{{ "s" if stale_count != 1 }} haven't been updated in 7+ days</strong>
+    <a href="/applications/reminders" class="btn" style="margin-left: 1rem;">View Reminders</a>
+</div>
+{% endif %}
+{% endblock %}

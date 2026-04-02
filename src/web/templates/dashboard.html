@@ -60,6 +60,37 @@
     </div>
 </div>
 
+<div class="card-grid" style="margin-top: 1.5rem;">
+    <div class="card">
+        <h3>Application Pipeline</h3>
+        {% if app_summary %}
+        <table class="table-compact">
+            {% for status, count in app_summary.items() %}
+            <tr>
+                <td>{{ status }}</td>
+                <td class="text-right"><strong>{{ count }}</strong></td>
+            </tr>
+            {% endfor %}
+        </table>
+        <p style="margin-top: 0.75rem;"><a href="/applications">View Kanban Board →</a></p>
+        {% else %}
+        <p class="muted">No applications tracked yet.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h3>Follow-Up Reminders</h3>
+        {% if stale_count > 0 %}
+        <div class="stat-large" style="color: var(--red);">{{ stale_count }}</div>
+        <p class="muted">applications need follow-up (7+ days stale)</p>
+        <p style="margin-top: 0.5rem;"><a href="/applications/reminders">View Reminders →</a></p>
+        {% else %}
+        <div class="stat-large" style="color: var(--green);">0</div>
+        <p class="muted">all applications up to date</p>
+        {% endif %}
+    </div>
+</div>
+
 {% if stats.latest_scrape %}
 <div class="card" style="margin-top: 1.5rem;">
     <h3>Latest Scrape</h3>

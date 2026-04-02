@@ -38,7 +38,7 @@ from src.tailoring.models import (
 
 logger = structlog.get_logger(__name__)
 
-PROMPT_VERSION = "v1.0"
+PROMPT_VERSION = "v1.1"
 
 
 def strip_code_fences(text: str) -> str:
@@ -96,9 +96,9 @@ class TailoringEngine:
     ) -> str:
         """Build structured prompt for Claude API."""
         tier_strategy = {
-            1: "Apply Now — lead with quantified impact, mirror job keywords exactly",
-            2: "Build Credential — emphasize transferable skills and growth trajectory",
-            3: "Campaign — highlight domain expertise and strategic thinking",
+            1: "Apply Now — lead with quantified impact, mirror job keywords exactly. Do NOT insert skills the candidate does not have. Reframe existing experience for relevance instead.",
+            2: "Build Credential — emphasize transferable skills and growth trajectory. Do NOT insert skills the candidate does not have. Reframe existing experience for relevance instead.",
+            3: "Campaign — highlight domain expertise and strategic thinking. Do NOT insert skills the candidate does not have. Reframe existing experience for relevance instead.",
         }
 
         skill_context = "\n".join(
@@ -124,6 +124,13 @@ EMPHASIS AREAS: {', '.join(request.emphasis_areas) if request.emphasis_areas els
 
 RESUME BULLETS TO REWRITE:
 {bullet_list}
+
+RULES:
+- ONLY reference skills and tools the candidate ACTUALLY has (listed in "Candidate has" section). NEVER fabricate tool usage, platform experience, or technical claims.
+- Do NOT rewrite section headers (e.g., "[EXPERIENCE] Toast, Inc. — Manager II"). Only rewrite actual bullet points.
+- If a bullet has low relevance to the job, set a low relevance_score — do NOT force-fit keywords to inflate the score.
+- BAD example (keyword stuffing): "Managed escalation workflows using GCP-based incident management systems" when candidate never used GCP
+- GOOD example (honest reframing): "Managed escalation workflows across Engineering, Product, and Customer Success — directly transferable to cross-functional incident response"
 
 Respond with ONLY a JSON array. Each element must have:
 - "original": the original bullet text (exact match)
