@@ -41,7 +41,7 @@ Each stage runs as an independent `asyncio.Task`, communicating only through bou
 | `httpx` | HTTP client for LLM API calls |
 | `structlog` | Structured JSON logging |
 | `tenacity` | Retry logic with exponential backoff |
-| `pytest` + `pytest-asyncio` | 93 unit and integration tests |
+| `pytest` + `pytest-asyncio` | 140 unit and integration tests |
 
 ## Project Structure
 
@@ -49,6 +49,7 @@ Each stage runs as an independent `asyncio.Task`, communicating only through bou
 ceal/
 ├── src/
 │   ├── main.py                  # Pipeline orchestrator + CLI
+│   ├── demo.py                  # Demo mode — single-job tailoring without DB
 │   ├── models/
 │   │   ├── database.py          # Async SQLAlchemy engine, sessions, CRUD
 │   │   ├── entities.py          # Pydantic models (validation layer)
@@ -61,17 +62,27 @@ ceal/
 │   │   └── pipeline.py          # HTML cleanup, salary parsing, skill extraction
 │   ├── ranker/
 │   │   └── llm_ranker.py        # Claude API scoring + response parsing
+│   ├── tailoring/
+│   │   ├── resume_parser.py     # Resume text → ParsedResume with sections
+│   │   ├── skill_extractor.py   # Job ↔ resume skill gap analysis
+│   │   ├── engine.py            # Claude API bullet rewriting (X-Y-Z format)
+│   │   └── models.py            # Phase 2 Pydantic models
 │   └── utils/
 ├── tests/
-│   ├── unit/                    # 89 unit tests
+│   ├── unit/                    # 136 unit tests
 │   │   ├── test_database.py     # Schema, upserts, tiers, ranking, profiles
 │   │   ├── test_scrapers.py     # Parsing, pagination, rate limits, errors
 │   │   ├── test_normalizer.py   # Salary, HTML, skills, batch processing
-│   │   └── test_ranker.py       # LLM response parsing, API mocking
+│   │   ├── test_ranker.py       # LLM response parsing, API mocking
+│   │   ├── test_demo.py         # Demo mode pipeline tests
+│   │   ├── test_resume_parser.py # Resume parsing and section detection
+│   │   └── test_skill_extractor.py # Skill gap analysis tests
 │   ├── integration/             # 4 integration tests
 │   │   └── test_pipeline.py     # Full scrape → normalize → DB flow
 │   └── mocks/                   # Realistic HTML fixtures
-├── data/                        # SQLite database (gitignored)
+├── data/
+│   ├── resume.txt               # Candidate resume (plain text)
+│   └── sample_job.txt           # Sample job description for testing
 └── config/
 ```
 
@@ -89,6 +100,19 @@ python -m src.main --rank-only
 
 # Show top 10 matches
 python -m src.main --rank-only --top 10
+```
+
+## Demo Mode
+
+Run the tailoring pipeline on a single job description without live scraping:
+
+```bash
+# Offline mode (skill gap analysis only, no API key needed)
+PYTHONPATH=. python -m src.main --demo --resume data/resume.txt --job data/sample_job.txt
+
+# Full mode with LLM-powered bullet tailoring
+echo "LLM_API_KEY=your_key_here" > .env
+PYTHONPATH=. python -m src.main --demo --resume data/resume.txt --job data/sample_job.txt
 ```
 
 ## Database Schema
@@ -113,7 +137,7 @@ PYTHONPATH=. pytest tests/ -v
 
 ## Roadmap
 
-- **Phase 2**: Resume tailoring — auto-generate role-specific emphasis per listing
+- **Phase 2**: Resume tailoring — **alpha complete**. Demo mode for single-job analysis, skill gap detection, LLM-powered X-Y-Z bullet generation.
 - **Phase 3**: Application tracking CRM — dashboard, response rates, follow-up reminders
 - **Phase 4**: Auto-apply with approval queue — pre-fill applications, human reviews before submit
 
