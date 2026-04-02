@@ -41,7 +41,8 @@ Each stage runs as an independent `asyncio.Task`, communicating only through bou
 | `httpx` | HTTP client for LLM API calls |
 | `structlog` | Structured JSON logging |
 | `tenacity` | Retry logic with exponential backoff |
-| `pytest` + `pytest-asyncio` | 140 unit and integration tests |
+| `python-docx` | .docx resume export |
+| `pytest` + `pytest-asyncio` | 158 unit and integration tests |
 
 ## Project Structure
 
@@ -50,6 +51,9 @@ ceal/
 ├── src/
 │   ├── main.py                  # Pipeline orchestrator + CLI
 │   ├── demo.py                  # Demo mode — single-job tailoring without DB
+│   ├── batch.py                 # Batch tailoring of all ranked jobs
+│   ├── fetcher.py               # URL-to-text job description fetcher
+│   ├── export.py                # .docx export of tailored resume bullets
 │   ├── models/
 │   │   ├── database.py          # Async SQLAlchemy engine, sessions, CRUD
 │   │   ├── entities.py          # Pydantic models (validation layer)
@@ -66,17 +70,23 @@ ceal/
 │   │   ├── resume_parser.py     # Resume text → ParsedResume with sections
 │   │   ├── skill_extractor.py   # Job ↔ resume skill gap analysis
 │   │   ├── engine.py            # Claude API bullet rewriting (X-Y-Z format)
-│   │   └── models.py            # Phase 2 Pydantic models
+│   │   ├── models.py            # Phase 2 Pydantic models
+│   │   ├── persistence.py       # Phase 2 CRUD layer (save/retrieve results)
+│   │   └── db_models.py         # Phase 2 SQLAlchemy ORM table definitions
 │   └── utils/
 ├── tests/
-│   ├── unit/                    # 136 unit tests
+│   ├── unit/                    # 154 unit tests
 │   │   ├── test_database.py     # Schema, upserts, tiers, ranking, profiles
 │   │   ├── test_scrapers.py     # Parsing, pagination, rate limits, errors
 │   │   ├── test_normalizer.py   # Salary, HTML, skills, batch processing
 │   │   ├── test_ranker.py       # LLM response parsing, API mocking
 │   │   ├── test_demo.py         # Demo mode pipeline tests
 │   │   ├── test_resume_parser.py # Resume parsing and section detection
-│   │   └── test_skill_extractor.py # Skill gap analysis tests
+│   │   ├── test_skill_extractor.py # Skill gap analysis tests
+│   │   ├── test_persistence.py  # Tailoring CRUD round-trip tests
+│   │   ├── test_batch.py        # Batch tailoring mode tests
+│   │   ├── test_fetcher.py      # URL fetcher and HTML stripping tests
+│   │   └── test_export.py       # .docx export tests
 │   ├── integration/             # 4 integration tests
 │   │   └── test_pipeline.py     # Full scrape → normalize → DB flow
 │   └── mocks/                   # Realistic HTML fixtures
@@ -113,6 +123,36 @@ PYTHONPATH=. python -m src.main --demo --resume data/resume.txt --job data/sampl
 # Full mode with LLM-powered bullet tailoring
 echo "LLM_API_KEY=your_key_here" > .env
 PYTHONPATH=. python -m src.main --demo --resume data/resume.txt --job data/sample_job.txt
+
+# Fetch job description from a URL instead of a local file
+PYTHONPATH=. python -m src.main --demo --resume data/resume.txt --job-url https://example.com/job
+
+# Save tailoring results to the database
+PYTHONPATH=. python -m src.main --demo --resume data/resume.txt --job data/sample_job.txt --save
+```
+
+## Batch Mode
+
+Process all ranked jobs through the tailoring pipeline at once:
+
+```bash
+# Tailor top 20 ranked jobs (default)
+PYTHONPATH=. python -m src.main --batch --resume data/resume.txt
+
+# Tailor top 50 jobs with minimum 70% match score
+PYTHONPATH=. python -m src.main --batch --resume data/resume.txt --limit 50 --min-score 0.7
+```
+
+## Export
+
+Export tailored results to a Word document:
+
+```bash
+# Export tailored results for job_id=42
+PYTHONPATH=. python -m src.main --export 42
+
+# Export to a custom directory
+PYTHONPATH=. python -m src.main --export 42 --export-dir reports/
 ```
 
 ## Database Schema
@@ -137,7 +177,7 @@ PYTHONPATH=. pytest tests/ -v
 
 ## Roadmap
 
-- **Phase 2**: Resume tailoring — **alpha complete**. Demo mode for single-job analysis, skill gap detection, LLM-powered X-Y-Z bullet generation.
+- **Phase 2**: Resume tailoring — **complete**. Demo mode, batch processing, URL fetching, persistence layer, .docx export, skill gap detection, LLM-powered X-Y-Z bullet generation.
 - **Phase 3**: Application tracking CRM — dashboard, response rates, follow-up reminders
 - **Phase 4**: Auto-apply with approval queue — pre-fill applications, human reviews before submit
 
