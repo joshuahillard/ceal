@@ -21,9 +21,9 @@ async def job_list(
     tier_int = int(tier) if tier and tier.strip() else None
     jobs = await get_top_matches(min_score=min_score, tier=tier_int, limit=limit)
     return templates.TemplateResponse(
+        request,
         "jobs.html",
-        {
-            "request": request,
+        context={
             "jobs": jobs,
             "filters": {
                 "min_score": min_score,

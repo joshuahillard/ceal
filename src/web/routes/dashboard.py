@@ -22,9 +22,9 @@ async def dashboard(request: Request):
     stale = await get_stale_applications(days=7)
     apply_stats = await get_application_stats()
     return templates.TemplateResponse(
+        request,
         "dashboard.html",
-        {
-            "request": request,
+        context={
             "stats": stats,
             "app_summary": app_summary,
             "stale_count": len(stale),

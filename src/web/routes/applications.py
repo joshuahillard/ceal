@@ -31,9 +31,9 @@ async def kanban_board(request: Request):
     stale = await get_stale_applications(days=7)
 
     return templates.TemplateResponse(
+        request,
         "applications.html",
-        {
-            "request": request,
+        context={
             "summary": summary,
             "columns": columns,
             "stale_jobs": stale,
@@ -60,9 +60,9 @@ async def update_status(
         stale = await get_stale_applications(days=7)
 
         return templates.TemplateResponse(
+            request,
             "applications.html",
-            {
-                "request": request,
+            context={
                 "summary": summary,
                 "columns": columns,
                 "stale_jobs": stale,
@@ -80,9 +80,9 @@ async def reminders(
     """Show stale applications needing follow-up."""
     stale = await get_stale_applications(days=days)
     return templates.TemplateResponse(
+        request,
         "reminders.html",
-        {
-            "request": request,
+        context={
             "stale_jobs": stale,
             "days_threshold": days,
         },

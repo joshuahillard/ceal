@@ -23,9 +23,9 @@ async def approval_queue(request: Request, status: str = Query("draft")):
     queue = await get_approval_queue(status=status)
     stats = await get_application_stats()
     return templates.TemplateResponse(
+        request,
         "approval_queue.html",
-        {
-            "request": request,
+        context={
             "queue": queue,
             "stats": stats,
             "current_filter": status,
@@ -49,9 +49,9 @@ async def review_application(request: Request, app_id: int):
     if not application:
         return RedirectResponse(url="/apply", status_code=303)
     return templates.TemplateResponse(
+        request,
         "application_review.html",
-        {
-            "request": request,
+        context={
             "application": application,
         },
     )
@@ -66,9 +66,9 @@ async def update_status(request: Request, app_id: int, new_status: str = Form(..
     except ValueError as e:
         application = await get_application(app_id)
         return templates.TemplateResponse(
+            request,
             "application_review.html",
-            {
-                "request": request,
+            context={
                 "application": application,
                 "error": str(e),
             },
