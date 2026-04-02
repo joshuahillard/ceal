@@ -563,10 +563,16 @@ async def _async_main() -> None:
         type=str,
         help="Path to resume text file (used with --demo)",
     )
-    parser.add_argument(
+    job_source = parser.add_mutually_exclusive_group()
+    job_source.add_argument(
         "--job",
         type=str,
         help="Path to job description text file (used with --demo)",
+    )
+    job_source.add_argument(
+        "--job-url",
+        type=str,
+        help="URL to fetch job description from (used with --demo)",
     )
     parser.add_argument(
         "--save",
@@ -578,12 +584,28 @@ async def _async_main() -> None:
 
     # Demo mode — separate pipeline, no DB needed
     if args.demo:
-        if not args.resume or not args.job:
-            parser.error("--demo requires both --resume and --job")
+        if not args.resume:
+            parser.error("--demo requires --resume")
+        if not args.job and not args.job_url:
+            parser.error("--demo requires either --job or --job-url")
+
+        job_path = args.job
+        if args.job_url:
+            # Fetch job description from URL into a temp file
+            import tempfile
+
+            from src.fetcher import fetch_job_description
+            job_text = await fetch_job_description(args.job_url)
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".txt", delete=False, encoding="utf-8",
+            ) as tmp:
+                tmp.write(job_text)
+                job_path = tmp.name
+
         from src.demo import run_demo
         await run_demo(
             resume_path=args.resume,
-            job_path=args.job,
+            job_path=job_path,
             save=getattr(args, "save", False),
         )
         return
