@@ -298,6 +298,75 @@ class TestRanking:
         assert len(matches) == 2
         assert matches[0]["match_score"] == 0.9  # highest first
 
+    @pytest.mark.asyncio
+    async def test_get_top_matches_excludes_submitted_applications(self):
+        """Jobs with a submitted application should not appear in the jobs list."""
+        from sqlalchemy import text as sa_text
+
+        from src.models.database import get_session
+
+        id1 = await upsert_job(_make_job(external_id="app_1", company="Stripe"))
+        id2 = await upsert_job(_make_job(external_id="app_2", company="Datadog"))
+
+        for jid, score in [(id1, 0.9), (id2, 0.8)]:
+            await update_job_ranking(RankedResult(
+                job_id=jid, match_score=score,
+                match_reasoning="Test reasoning for ranking", rank_model_version="test",
+            ))
+
+        # Create a resume profile for the FK, then submit an application for job 1
+        profile_id = await create_resume_profile("Test Profile", "test resume text")
+        async with get_session() as session:
+            await session.execute(
+                sa_text("""
+                    INSERT INTO applications (job_id, profile_id, status)
+                    VALUES (:job_id, :profile_id, 'submitted')
+                """),
+                {"job_id": id1, "profile_id": profile_id},
+            )
+
+        matches = await get_top_matches()
+        job_ids = [m["id"] for m in matches]
+        assert id1 not in job_ids, "Submitted application job should be excluded"
+        assert id2 in job_ids, "Non-applied job should still appear"
+
+    @pytest.mark.asyncio
+    async def test_get_top_matches_includes_unranked_jobs(self):
+        """Unranked (scraped) jobs should appear when min_score is 0."""
+        await upsert_job(_make_job(external_id="unranked_1", company="NewCo"))
+        matches = await get_top_matches(min_score=0.0)
+        assert len(matches) == 1
+        assert matches[0]["status"] == "scraped"
+        assert matches[0]["match_score"] is None
+
+    @pytest.mark.asyncio
+    async def test_get_top_matches_excludes_applied_status(self):
+        """Jobs with CRM statuses (applied, interviewing, etc.) should not appear."""
+        from sqlalchemy import text as sa_text
+
+        from src.models.database import get_session
+
+        id1 = await upsert_job(_make_job(external_id="crm_1", company="Stripe"))
+        id2 = await upsert_job(_make_job(external_id="crm_2", company="Datadog"))
+
+        for jid, score in [(id1, 0.9), (id2, 0.8)]:
+            await update_job_ranking(RankedResult(
+                job_id=jid, match_score=score,
+                match_reasoning="Test reasoning for ranking", rank_model_version="test",
+            ))
+
+        # Move job 1 to 'applied' status directly in DB
+        async with get_session() as session:
+            await session.execute(
+                sa_text("UPDATE job_listings SET status = 'applied' WHERE id = :id"),
+                {"id": id1},
+            )
+
+        matches = await get_top_matches()
+        job_ids = [m["id"] for m in matches]
+        assert id1 not in job_ids, "Applied job should be on the CRM board, not here"
+        assert id2 in job_ids
+
 
 # ---------------------------------------------------------------------------
 # Scrape Log Tests

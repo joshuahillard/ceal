@@ -448,32 +448,43 @@ async def assign_company_tiers() -> int:
 
 
 async def get_top_matches(
-    min_score: float = 0.5,
+    min_score: float = 0.0,
     tier: int | None = None,
-    limit: int = 20,
+    limit: int = 50,
 ) -> list[dict]:
     """
-    Get the highest-ranked jobs, optionally filtered by tier.
-    This powers the "what should I apply to today?" query.
+    Get jobs that are still actionable — scraped or ranked, not yet in the
+    application pipeline.  Jobs with a submitted application belong on the
+    CRM board, not here.
+
+    Filters:
+      - status IN ('scraped', 'ranked') — pre-pipeline jobs only
+      - match_score >= min_score  (unranked jobs have NULL score and are
+        included when min_score == 0)
+      - optional company_tier filter
+      - excludes any job that already has a submitted application
     """
     params: dict = {"min_score": min_score, "limit": limit}
 
     tier_clause = ""
     if tier is not None:
-        tier_clause = "AND company_tier = :tier"
+        tier_clause = "AND jl.company_tier = :tier"
         params["tier"] = tier
 
     async with get_session() as session:
         result = await session.execute(
             text(f"""
-                SELECT id, title, company_name, company_tier,
-                       match_score, match_reasoning, url, location,
-                       remote_type, salary_min, salary_max, status
-                FROM job_listings
-                WHERE (match_score >= :min_score OR match_score IS NULL)
-                  AND status != 'archived'
+                SELECT jl.id, jl.title, jl.company_name, jl.company_tier,
+                       jl.match_score, jl.match_reasoning, jl.url, jl.location,
+                       jl.remote_type, jl.salary_min, jl.salary_max, jl.status
+                FROM job_listings jl
+                LEFT JOIN applications app
+                  ON app.job_id = jl.id AND app.status = 'submitted'
+                WHERE jl.status IN ('scraped', 'ranked')
+                  AND (jl.match_score >= :min_score OR jl.match_score IS NULL)
+                  AND app.id IS NULL
                   {tier_clause}
-                ORDER BY match_score DESC, company_tier ASC
+                ORDER BY jl.match_score DESC NULLS LAST, jl.company_tier ASC
                 LIMIT :limit
             """),
             params,

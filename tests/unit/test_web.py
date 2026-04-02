@@ -122,6 +122,14 @@ class TestJobs:
         assert "No jobs match" in response.text
 
     @pytest.mark.asyncio
+    async def test_jobs_default_min_score_zero(self, client):
+        """GET /jobs with no params uses min_score=0.0 to show all jobs."""
+        with patch("src.web.routes.jobs.get_top_matches", new_callable=AsyncMock, return_value=[]) as mock:
+            response = await client.get("/jobs")
+        assert response.status_code == 200
+        mock.assert_called_once_with(min_score=0.0, tier=None, limit=50)
+
+    @pytest.mark.asyncio
     async def test_jobs_filter_params(self, client):
         """GET /jobs passes filter parameters correctly."""
         with patch("src.web.routes.jobs.get_top_matches", new_callable=AsyncMock, return_value=[]) as mock:

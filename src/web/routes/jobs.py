@@ -12,7 +12,7 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 @router.get("/")
 async def job_list(
     request: Request,
-    min_score: float = Query(0.3, ge=0.0, le=1.0, description="Minimum match score"),
+    min_score: float = Query(0.0, ge=0.0, le=1.0, description="Minimum match score"),
     tier: str | None = Query(None, description="Filter by company tier"),
     limit: int = Query(50, ge=1, le=200, description="Max results"),
 ):
