@@ -596,6 +596,18 @@ async def _async_main() -> None:
         default=0.5,
         help="Minimum match score for batch mode (default: 0.5)",
     )
+    parser.add_argument(
+        "--export",
+        type=int,
+        metavar="JOB_ID",
+        help="Export tailored results for a job to .docx (by job_id)",
+    )
+    parser.add_argument(
+        "--export-dir",
+        type=str,
+        default="output",
+        help="Directory for exported .docx files (default: output/)",
+    )
 
     args = parser.parse_args()
 
@@ -638,6 +650,31 @@ async def _async_main() -> None:
             min_score=args.min_score,
         )
         print(f"\n  Batch complete: {stats}")
+        return
+
+    # Export mode — generate .docx from saved tailoring results
+    if args.export:
+        from pathlib import Path
+
+        from src.export import export_tailoring_result
+        from src.tailoring.persistence import get_tailoring_results
+
+        result = await get_tailoring_results(job_id=args.export, profile_id=1)
+        if result is None:
+            print(f"\n  No tailoring results found for job_id={args.export}")
+            return
+
+        export_dir = Path(args.export_dir)
+        export_dir.mkdir(parents=True, exist_ok=True)
+        out_path = export_dir / f"tailored_job_{args.export}.docx"
+
+        export_tailoring_result(
+            result=result,
+            job_title=f"Job {args.export}",
+            company_name="",
+            output_path=out_path,
+        )
+        print(f"\n  Exported to {out_path}")
         return
 
     if args.rank_only:
