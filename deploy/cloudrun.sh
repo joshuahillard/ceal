@@ -6,6 +6,12 @@
 #   - GCP project set: gcloud config set project YOUR_PROJECT_ID
 #   - Artifact Registry repo created:
 #     gcloud artifacts repositories create ceal --repository-format=docker --location=us-east1
+#   - Cloud SQL instance created:
+#     gcloud sql instances create ceal-db --database-version=POSTGRES_16 --tier=db-f1-micro --region=us-east1
+#   - Database created:
+#     gcloud sql databases create ceal --instance=ceal-db
+#   - User created:
+#     gcloud sql users create ceal --instance=ceal-db --password=YOUR_PASSWORD
 #
 # Usage:
 #   ./deploy/cloudrun.sh
@@ -43,7 +49,8 @@ gcloud run deploy "${SERVICE_NAME}" \
     --cpu 1 \
     --min-instances 0 \
     --max-instances 3 \
-    --set-env-vars "PYTHONPATH=." \
+    --add-cloudsql-instances "${GCP_PROJECT_ID}:${REGION}:ceal-db" \
+    --set-env-vars "DATABASE_URL=postgresql+asyncpg://ceal@/ceal?host=/cloudsql/${GCP_PROJECT_ID}:${REGION}:ceal-db,PYTHONPATH=." \
     --set-secrets "LLM_API_KEY=ceal-llm-api-key:latest" \
     --allow-unauthenticated \
     --quiet

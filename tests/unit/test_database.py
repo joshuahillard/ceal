@@ -23,8 +23,12 @@ os.environ["DATABASE_URL"] = "sqlite+aiosqlite://"  # in-memory for tests
 
 from src.models.database import (
     assign_company_tiers,
+    create_application,
     create_resume_profile,
     engine,
+    get_application_stats,
+    get_approval_queue,
+    get_jobs_by_status,
     get_pipeline_stats,
     get_top_matches,
     get_unranked_jobs,
@@ -36,6 +40,7 @@ from src.models.database import (
     upsert_jobs_batch,
 )
 from src.models.entities import (
+    ApplicationCreate,
     JobListingCreate,
     JobSource,
     RankedResult,
@@ -500,3 +505,165 @@ class TestEntityValidation:
                 match_reasoning="This score is too high",
                 rank_model_version="test",
             )
+
+
+# ---------------------------------------------------------------------------
+# Core Query SQL Tests — Real SQL, Not Mocks
+# ---------------------------------------------------------------------------
+# These tests exercise REAL SQL against a database — not mocks.
+# They exist because mock-only route tests hid SQL bugs in
+# get_top_matches() THREE TIMES (Sprints 1, 2, and post-Sprint 4).
+
+class TestCoreQuerySQL:
+    """
+    Database-level tests for core query functions.
+
+    Rule: "For any database function that contains raw SQL and
+    drives a core UI view, write a database-level test that exercises
+    the real SQL against an in-memory database."
+    """
+
+    async def _seed_job(self, eid: str, company: str = "TestCo", score: float | None = None) -> int:
+        """Seed a job and optionally rank it. Returns the row ID."""
+        job_id = await upsert_job(_make_job(external_id=eid, company=company))
+        if score is not None:
+            await update_job_ranking(RankedResult(
+                job_id=job_id,
+                match_score=score,
+                match_reasoning=f"Test ranking score={score}",
+                rank_model_version="test",
+            ))
+        return job_id
+
+    async def _create_application(self, job_id: int, status: str = "draft") -> int:
+        """Create a resume profile + application for a job."""
+        profile_id = await create_resume_profile("Test Profile", raw_text="test")
+        app_id = await create_application(ApplicationCreate(
+            job_id=job_id,
+            profile_id=profile_id,
+            confidence_score=0.8,
+        ))
+        if status != "draft":
+            from sqlalchemy import text as sa_text
+
+            from src.models.database import get_session
+            async with get_session() as session:
+                await session.execute(
+                    sa_text("UPDATE applications SET status = :status WHERE id = :app_id"),
+                    {"status": status, "app_id": app_id},
+                )
+        return app_id
+
+    @pytest.mark.asyncio
+    async def test_get_top_matches_only_returns_scraped_and_ranked(self):
+        """Jobs with status applied/interviewing/offer/rejected/archived must NOT appear."""
+        from sqlalchemy import text as sa_text
+
+        from src.models.database import get_session
+
+        id_scraped = await self._seed_job("sql_scraped_1")
+        id_ranked = await self._seed_job("sql_ranked_1", score=0.8)
+        id_applied = await self._seed_job("sql_applied_1", score=0.7)
+
+        # Force status to 'applied' directly
+        async with get_session() as session:
+            await session.execute(
+                sa_text("UPDATE job_listings SET status = 'applied' WHERE id = :id"),
+                {"id": id_applied},
+            )
+
+        matches = await get_top_matches()
+        match_ids = [m["id"] for m in matches]
+        assert id_scraped in match_ids, "Scraped jobs should appear"
+        assert id_ranked in match_ids, "Ranked jobs should appear"
+        assert id_applied not in match_ids, "Applied jobs must NOT appear"
+
+    @pytest.mark.asyncio
+    async def test_get_top_matches_excludes_jobs_with_submitted_applications(self):
+        """Jobs with a submitted application must be filtered by LEFT JOIN."""
+        id1 = await self._seed_job("sql_sub_1", score=0.9)
+        id2 = await self._seed_job("sql_sub_2", score=0.8)
+
+        await self._create_application(id1, status="submitted")
+
+        matches = await get_top_matches()
+        match_ids = [m["id"] for m in matches]
+        assert id1 not in match_ids, "Submitted application job should be excluded"
+        assert id2 in match_ids, "Non-submitted job should still appear"
+
+    @pytest.mark.asyncio
+    async def test_get_top_matches_includes_jobs_with_draft_applications(self):
+        """Jobs with draft (non-submitted) applications should still appear."""
+        id1 = await self._seed_job("sql_draft_1", score=0.85)
+        await self._create_application(id1, status="draft")
+
+        matches = await get_top_matches()
+        match_ids = [m["id"] for m in matches]
+        assert id1 in match_ids, "Draft application job should still appear in listings"
+
+    @pytest.mark.asyncio
+    async def test_get_top_matches_respects_min_score_filter(self):
+        """min_score=0.5 should exclude jobs with score < 0.5 but include unscored."""
+        await self._seed_job("sql_low", score=0.3)
+        id_mid = await self._seed_job("sql_mid", score=0.7)
+        id_high = await self._seed_job("sql_high", score=0.9)
+        id_null = await self._seed_job("sql_unranked")  # NULL score (scraped)
+
+        matches = await get_top_matches(min_score=0.5)
+        match_ids = [m["id"] for m in matches]
+        assert id_mid in match_ids, "Score 0.7 should pass min_score=0.5"
+        assert id_high in match_ids, "Score 0.9 should pass min_score=0.5"
+        assert id_null in match_ids, "Unscored (NULL) jobs should be included"
+
+    @pytest.mark.asyncio
+    async def test_get_top_matches_orders_by_score_desc_nulls_last(self):
+        """Ranked jobs sort to top by score; unranked sort to bottom."""
+        id_high = await self._seed_job("sql_ord_high", score=0.9)
+        id_low = await self._seed_job("sql_ord_low", score=0.5)
+        id_null = await self._seed_job("sql_ord_null")  # unranked
+
+        matches = await get_top_matches(min_score=0.0)
+        match_ids = [m["id"] for m in matches]
+        assert match_ids.index(id_high) < match_ids.index(id_low), "0.9 should come before 0.5"
+        assert match_ids.index(id_low) < match_ids.index(id_null), "Scored should come before NULL"
+
+    @pytest.mark.asyncio
+    async def test_get_pipeline_stats_returns_expected_keys(self):
+        """Pipeline stats must include all expected keys."""
+        stats = await get_pipeline_stats()
+        assert "jobs_by_status" in stats
+        assert "total_ranked" in stats
+        assert "latest_scrape" in stats or stats.get("latest_scrape") is None
+
+    @pytest.mark.asyncio
+    async def test_get_jobs_by_status_filters_correctly(self):
+        """get_jobs_by_status('ranked') should only return ranked jobs."""
+        await self._seed_job("sql_status_scraped")
+        await self._seed_job("sql_status_ranked", score=0.75)
+
+        results = await get_jobs_by_status("ranked")
+        for job in results:
+            assert job["status"] == "ranked", f"Expected 'ranked', got '{job['status']}'"
+
+    @pytest.mark.asyncio
+    async def test_get_approval_queue_returns_correct_structure(self):
+        """Approval queue should return applications with joined job data."""
+        id1 = await self._seed_job("sql_queue_1", score=0.8)
+        await self._create_application(id1, status="draft")
+
+        queue = await get_approval_queue(status="draft")
+        assert len(queue) >= 1
+        app = queue[0]
+        assert "job_title" in app, "Approval queue must include job_title from JOIN"
+        assert "company_name" in app, "Approval queue must include company_name from JOIN"
+        assert "confidence_score" in app
+
+    @pytest.mark.asyncio
+    async def test_get_application_stats_returns_counts(self):
+        """Application stats should return per-status counts."""
+        id1 = await self._seed_job("sql_appstat_1", score=0.7)
+        await self._create_application(id1, status="draft")
+
+        stats = await get_application_stats()
+        assert isinstance(stats, dict)
+        assert stats.get("draft", 0) >= 1

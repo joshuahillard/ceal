@@ -17,6 +17,7 @@ from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+from src.models.compat import is_sqlite
 from src.tailoring.db_models import PHASE1_STUB_TABLES, Base
 
 # Alembic Config object — provides access to .ini file values
@@ -52,7 +53,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
-        render_as_batch=True,  # Required for SQLite ALTER TABLE support
+        render_as_batch=is_sqlite(),  # Batch mode required for SQLite ALTER TABLE support
         include_object=include_object,
     )
 
@@ -65,7 +66,7 @@ def do_run_migrations(connection) -> None:
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
-        render_as_batch=True,  # Required for SQLite ALTER TABLE support
+        render_as_batch=is_sqlite(),  # Batch mode required for SQLite ALTER TABLE support
         include_object=include_object,
     )
 

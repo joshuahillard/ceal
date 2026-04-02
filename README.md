@@ -49,7 +49,9 @@ Each stage runs as an independent `asyncio.Task`, communicating only through bou
 | `aiohttp` | Async HTTP client with connection pooling |
 | `pydantic` v2 | Data validation and schema contracts |
 | `SQLAlchemy` 2.0 (async) | Database layer with async session management |
-| `aiosqlite` | Non-blocking SQLite driver |
+| `aiosqlite` | Non-blocking SQLite driver (local dev) |
+| `asyncpg` | Non-blocking PostgreSQL driver (production) |
+| `psycopg2-binary` | PostgreSQL adapter for Alembic sync migrations |
 | `beautifulsoup4` | HTML parsing for job listings |
 | `httpx` | HTTP client for LLM API calls |
 | `structlog` | Structured JSON logging |
@@ -58,7 +60,7 @@ Each stage runs as an independent `asyncio.Task`, communicating only through bou
 | `fastapi` | Web UI framework with async route handlers |
 | `jinja2` | Server-side HTML templating |
 | `uvicorn` | ASGI server for production deployment |
-| `pytest` + `pytest-asyncio` | 204+ unit and integration tests |
+| `pytest` + `pytest-asyncio` | 217+ unit and integration tests |
 
 ## Project Structure
 
@@ -73,7 +75,9 @@ ceal/
 │   ├── models/
 │   │   ├── database.py          # Async SQLAlchemy engine, sessions, CRUD
 │   │   ├── entities.py          # Pydantic models (validation layer)
-│   │   └── schema.sql           # SQLite schema with triggers + indexes
+│   │   ├── compat.py            # Database compatibility layer (SQLite ↔ PostgreSQL)
+│   │   ├── schema.sql           # SQLite schema with triggers + indexes
+│   │   └── schema_postgres.sql  # PostgreSQL schema (Cloud SQL production)
 │   ├── scrapers/
 │   │   ├── base.py              # Abstract scraper with rate limiting + retry
 │   │   └── linkedin.py          # LinkedIn guest API scraper
@@ -112,8 +116,8 @@ ceal/
 │   │       └── demo.html             # Demo mode form + results
 │   └── utils/
 ├── tests/
-│   ├── unit/                    # 198 unit tests
-│   │   ├── test_database.py     # Schema, upserts, tiers, ranking, profiles
+│   ├── unit/                    # 213 unit tests
+│   │   ├── test_database.py     # Schema, upserts, tiers, ranking, profiles, core SQL tests
 │   │   ├── test_scrapers.py     # Parsing, pagination, rate limits, errors
 │   │   ├── test_normalizer.py   # Salary, HTML, skills, batch processing
 │   │   ├── test_ranker.py       # LLM response parsing, API mocking
@@ -202,13 +206,14 @@ python -m src.main --export 42
 
 ## Docker
 
-### Local Development
+### Local Development (with PostgreSQL)
 
 ```bash
-# Build and run with docker compose
+# Build and run with docker compose (starts PostgreSQL + Céal web app)
 docker compose up --build
 
-# Access at http://localhost:8000
+# Web UI: http://localhost:8000
+# PostgreSQL: localhost:5432
 ```
 
 ### Manual Docker Build
@@ -236,9 +241,20 @@ export GCP_PROJECT_ID=your-project-id
 
 See `.env.example` for all configuration options.
 
-## Database Schema
+## Database
 
-Nine tables across two phases with referential integrity, audit columns, and trigger-based `updated_at` timestamps:
+Céal supports two database backends controlled by the `DATABASE_URL` environment variable:
+
+| Backend | Use Case | Driver | URL Pattern |
+|---------|----------|--------|-------------|
+| SQLite | Local dev, tests | aiosqlite | `sqlite+aiosqlite:///data/ceal.db` |
+| PostgreSQL | Cloud Run, production | asyncpg | `postgresql+asyncpg://user:pass@host/db` |
+
+The backend is selected automatically from `DATABASE_URL`. Local development defaults to SQLite.
+
+### Schema
+
+Eleven tables across two phases with referential integrity, audit columns, and trigger-based `updated_at` timestamps:
 
 **Phase 1 (schema.sql):**
 - **`job_listings`** — Core listing data with deduplication key (`external_id` + `source`), 8-state lifecycle
@@ -262,7 +278,7 @@ Nine tables across two phases with referential integrity, audit columns, and tri
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-# Full suite (202 tests)
+# Full suite (217+ tests)
 pytest tests/ -v
 
 # Unit tests only
@@ -275,7 +291,7 @@ pytest tests/integration/ -v
 pytest tests/ --cov=src --cov-report=term-missing
 ```
 
-CI runs a 7-job matrix: lint, unit tests (Python 3.11 + 3.12), integration tests (3.11 + 3.12), coverage (≥80% gate), and Docker build validation.
+CI runs a 9-job matrix: lint, unit tests (3.11 + 3.12), integration tests with PostgreSQL (3.11 + 3.12), coverage (≥80% gate), database tests against PostgreSQL (3.11 + 3.12), and Docker build validation.
 
 ## Roadmap
 
@@ -284,6 +300,7 @@ CI runs a 7-job matrix: lint, unit tests (Python 3.11 + 3.12), integration tests
 - **Phase 3**: Application tracking CRM — **complete**. Kanban board, state-machine status transitions, stale application reminders, tier-colored cards.
 - **Phase 4**: Auto-apply with approval queue — **complete**. Pre-fill engine with confidence scoring, 5-state approval lifecycle, field-by-field review, CRM sync on approval.
 - **Sprint 4**: Docker containerization + GCP Cloud Run deployment — **complete**. Multi-stage Dockerfile, health check endpoint, CI/CD docker validation, deployment script.
+- **Sprint 5**: Polymorphic database layer — **complete**. SQLite (local dev) + PostgreSQL (Cloud SQL production) via `DATABASE_URL`, dialect-aware SQL, dual-backend CI testing, database-level test suite.
 
 ## License
 

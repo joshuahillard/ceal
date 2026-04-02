@@ -13,7 +13,7 @@ WORKDIR /build
 
 # Install build dependencies (some pip packages need gcc for C extensions)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc && \
+    apt-get install -y --no-install-recommends gcc libpq-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy only requirements first (layer caching — rebuilds only when deps change)
@@ -26,6 +26,11 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 # Stage 2: Runtime
 # ---------------------------------------------------------------------------
 FROM python:3.11-slim AS runtime
+
+# Install runtime dependency for asyncpg (PostgreSQL client library)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libpq5 && \
+    rm -rf /var/lib/apt/lists/*
 
 # Security: run as non-root user
 RUN groupadd -r ceal && useradd -r -g ceal -d /app -s /sbin/nologin ceal

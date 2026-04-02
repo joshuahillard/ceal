@@ -22,9 +22,9 @@ Architecture decisions (interview-defensible):
 
 from __future__ import annotations
 
-import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 import structlog
@@ -37,6 +37,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import StaticPool
 
+from src.models.compat import get_database_url, is_sqlite
 from src.models.entities import (
     ApplicationCreate,
     JobListingCreate,
@@ -51,23 +52,44 @@ logger = structlog.get_logger(__name__)
 # Engine Configuration
 # ---------------------------------------------------------------------------
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "sqlite+aiosqlite:///data/ceal.db",
-)
 
-# For in-memory SQLite (tests), we need StaticPool so all sessions
-# share the same connection — otherwise each connection gets its own
-# empty database. For file-based SQLite, standard pooling is fine.
-_engine_kwargs: dict = {"echo": False}
-if DATABASE_URL == "sqlite+aiosqlite://":
-    # In-memory: single shared connection
-    _engine_kwargs["poolclass"] = StaticPool
-    _engine_kwargs["connect_args"] = {"check_same_thread": False}
-else:
-    _engine_kwargs["pool_pre_ping"] = True
+def _create_engine():
+    """
+    Create the async database engine based on DATABASE_URL.
 
-engine = create_async_engine(DATABASE_URL, **_engine_kwargs)
+    SQLite: Uses StaticPool for tests, check_same_thread=False for async.
+    PostgreSQL: Standard async pool with asyncpg driver.
+
+    Interview point: "The engine factory detects the backend from an
+    environment variable — same codebase runs SQLite locally and
+    PostgreSQL in production with zero code changes."
+    """
+    url = get_database_url()
+
+    if is_sqlite(url):
+        connect_args = {"check_same_thread": False}
+        kwargs: dict = {
+            "echo": False,
+            "connect_args": connect_args,
+        }
+        # In-memory SQLite (tests): single shared connection via StaticPool
+        if url == "sqlite+aiosqlite://":
+            kwargs["poolclass"] = StaticPool
+        else:
+            kwargs["pool_pre_ping"] = True
+        return create_async_engine(url, **kwargs)
+    else:
+        # PostgreSQL via asyncpg
+        return create_async_engine(
+            url,
+            echo=False,
+            pool_size=5,
+            max_overflow=10,
+            pool_pre_ping=True,
+        )
+
+
+engine = _create_engine()
 
 
 # ---------------------------------------------------------------------------
@@ -76,17 +98,19 @@ engine = create_async_engine(DATABASE_URL, **_engine_kwargs)
 # Why: SQLite PRAGMAs are per-connection, not per-database. If you set WAL
 # once and never again, new connections revert to the default journal mode.
 # This event listener guarantees every connection is configured correctly.
+# Only applies to SQLite — PostgreSQL does not support PRAGMAs.
 
-@event.listens_for(engine.sync_engine, "connect")
-def _set_sqlite_pragmas(dbapi_conn, connection_record):
-    """Configure SQLite for concurrent async access."""
-    cursor = dbapi_conn.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL")       # concurrent reads + writes
-    cursor.execute("PRAGMA foreign_keys=ON")         # enforce referential integrity
-    cursor.execute("PRAGMA busy_timeout=5000")       # 5s retry on lock
-    cursor.execute("PRAGMA synchronous=NORMAL")      # safe with WAL, 2x faster
-    cursor.execute("PRAGMA cache_size=-64000")       # 64MB page cache
-    cursor.close()
+if is_sqlite():
+    @event.listens_for(engine.sync_engine, "connect")
+    def _set_sqlite_pragmas(dbapi_conn, connection_record):
+        """Configure SQLite for concurrent async access."""
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")       # concurrent reads + writes
+        cursor.execute("PRAGMA foreign_keys=ON")         # enforce referential integrity
+        cursor.execute("PRAGMA busy_timeout=5000")       # 5s retry on lock
+        cursor.execute("PRAGMA synchronous=NORMAL")      # safe with WAL, 2x faster
+        cursor.execute("PRAGMA cache_size=-64000")       # 64MB page cache
+        cursor.close()
 
 
 # ---------------------------------------------------------------------------
@@ -136,26 +160,38 @@ async def init_db(schema_path: str | None = None) -> None:
     Idempotent — safe to call on every startup because all CREATE statements
     use IF NOT EXISTS.
 
+    Automatically selects the correct schema file based on the backend:
+    - SQLite: schema.sql (with AUTOINCREMENT, datetime('now'), triggers)
+    - PostgreSQL: schema_postgres.sql (with SERIAL, NOW(), trigger functions)
+
     Args:
-        schema_path: Path to schema.sql. Defaults to src/models/schema.sql.
+        schema_path: Path to schema file. Defaults to the backend-appropriate
+                     schema in src/models/.
     """
     if schema_path is None:
-        schema_path = str(
-            Path(__file__).parent / "schema.sql"
-        )
+        if is_sqlite():
+            schema_path = str(Path(__file__).parent / "schema.sql")
+        else:
+            schema_path = str(Path(__file__).parent / "schema_postgres.sql")
 
     schema_sql = Path(schema_path).read_text()
 
-    # We need a smart SQL splitter because TRIGGER bodies contain
-    # semicolons inside BEGIN...END blocks. Naive split on ";" breaks them.
-    statements = _split_sql_statements(schema_sql)
+    if is_sqlite():
+        # SQLite: use smart splitter for BEGIN...END trigger blocks
+        statements = _split_sql_statements(schema_sql)
+        async with get_session() as session:
+            for stmt in statements:
+                if stmt:
+                    await session.execute(text(stmt))
+    else:
+        # PostgreSQL: split on semicolons (no BEGIN...END ambiguity)
+        async with engine.begin() as conn:
+            for statement in schema_sql.split(";"):
+                statement = statement.strip()
+                if statement:
+                    await conn.execute(text(statement))
 
-    async with get_session() as session:
-        for stmt in statements:
-            if stmt:
-                await session.execute(text(stmt))
-
-    logger.info("database_initialized", schema=schema_path)
+    logger.info("database_initialized", schema=schema_path, backend="postgresql" if not is_sqlite() else "sqlite")
 
 
 def _split_sql_statements(sql: str) -> list[str]:
@@ -393,6 +429,7 @@ async def update_job_ranking(result: RankedResult) -> None:
     Apply the LLM ranker's output to a job listing.
     Updates score, reasoning, model version, and status in one statement.
     """
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     async with get_session() as session:
         await session.execute(
             text("""
@@ -401,7 +438,7 @@ async def update_job_ranking(result: RankedResult) -> None:
                     match_reasoning = :reasoning,
                     rank_model_version = :model_version,
                     status = 'ranked',
-                    ranked_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+                    ranked_at = :ranked_at
                 WHERE id = :job_id
             """),
             {
@@ -409,6 +446,7 @@ async def update_job_ranking(result: RankedResult) -> None:
                 "reasoning": result.match_reasoning,
                 "model_version": result.rank_model_version,
                 "job_id": result.job_id,
+                "ranked_at": now,
             },
         )
     logger.info(
@@ -564,9 +602,10 @@ async def link_resume_skill(
 
         await session.execute(
             text("""
-                INSERT OR IGNORE INTO resume_skills
+                INSERT INTO resume_skills
                     (profile_id, skill_id, proficiency, years_experience, evidence)
                 VALUES (:pid, :sid, :prof, :years, :evidence)
+                ON CONFLICT(profile_id, skill_id) DO NOTHING
             """),
             {
                 "pid": profile_id,
@@ -748,20 +787,34 @@ async def get_stale_applications(days: int = 7) -> list[dict]:
     Only flags jobs in active states (applied, responded, interviewing) —
     not scraped/ranked (pre-application) or terminal states (offer/rejected/archived).
     """
+    # Use Python-side cutoff date to avoid dialect-specific date functions
+    from datetime import timedelta
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
     async with get_session() as session:
         result = await session.execute(
             text("""
                 SELECT id, title, company_name, company_tier, match_score,
-                       status, updated_at,
-                       CAST(julianday('now') - julianday(updated_at) AS INTEGER) as days_stale
+                       status, updated_at
                 FROM job_listings
                 WHERE status IN ('applied', 'responded', 'interviewing')
-                  AND julianday('now') - julianday(updated_at) >= :days
+                  AND updated_at <= :cutoff
                 ORDER BY updated_at ASC
             """),
-            {"days": days},
+            {"cutoff": cutoff},
         )
-        return [dict(row._mapping) for row in result]
+        rows = []
+        now_dt = datetime.now(timezone.utc)
+        for row in result:
+            d = dict(row._mapping)
+            # Compute days_stale in Python for cross-backend compatibility
+            try:
+                updated = datetime.strptime(d["updated_at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                d["days_stale"] = (now_dt - updated).days
+            except (ValueError, TypeError):
+                d["days_stale"] = days  # fallback
+            rows.append(d)
+        return rows
 
 
 # ---------------------------------------------------------------------------
@@ -920,8 +973,10 @@ async def update_application_status(app_id: int, new_status: str) -> dict:
         update_fields = {"new_status": new_status, "app_id": app_id}
 
         if new_status == "submitted":
+            now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            update_fields["submitted_at"] = now
             await session.execute(
-                text("UPDATE applications SET status = :new_status, submitted_at = datetime('now') WHERE id = :app_id"),
+                text("UPDATE applications SET status = :new_status, submitted_at = :submitted_at WHERE id = :app_id"),
                 update_fields,
             )
         else:
@@ -961,6 +1016,7 @@ async def get_application_stats() -> dict:
 
 async def save_document_template(doc_type: str, filename: str, file_blob: bytes, content_type: str) -> int:
     """Upsert a document template (one per doc_type)."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     async with get_session() as session:
         result = await session.execute(
             text("""
@@ -970,10 +1026,10 @@ async def save_document_template(doc_type: str, filename: str, file_blob: bytes,
                     filename = :filename,
                     file_blob = :file_blob,
                     content_type = :content_type,
-                    uploaded_at = datetime('now')
+                    uploaded_at = :now
                 RETURNING id
             """),
-            {"doc_type": doc_type, "filename": filename, "file_blob": file_blob, "content_type": content_type},
+            {"doc_type": doc_type, "filename": filename, "file_blob": file_blob, "content_type": content_type, "now": now},
         )
         return result.scalar_one()
 
@@ -1000,6 +1056,7 @@ async def get_all_document_templates() -> list[dict]:
 
 async def save_generated_document(application_id: int, doc_type: str, filename: str, file_blob: bytes, content_type: str) -> int:
     """Upsert a generated document for an application."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     async with get_session() as session:
         result = await session.execute(
             text("""
@@ -1009,10 +1066,10 @@ async def save_generated_document(application_id: int, doc_type: str, filename: 
                     filename = :filename,
                     file_blob = :file_blob,
                     content_type = :content_type,
-                    generated_at = datetime('now')
+                    generated_at = :now
                 RETURNING id
             """),
-            {"app_id": application_id, "doc_type": doc_type, "filename": filename, "file_blob": file_blob, "content_type": content_type},
+            {"app_id": application_id, "doc_type": doc_type, "filename": filename, "file_blob": file_blob, "content_type": content_type, "now": now},
         )
         return result.scalar_one()
 
