@@ -87,7 +87,12 @@ def _print_metadata(
     print()
 
 
-async def run_demo(resume_path: str, job_path: str) -> None:
+async def run_demo(
+    resume_path: str,
+    job_path: str,
+    *,
+    save: bool = False,
+) -> None:
     """Run the Phase 2 demo pipeline on a single resume + job pair."""
     # Validate files exist
     if not os.path.isfile(resume_path):
@@ -161,6 +166,27 @@ async def run_demo(resume_path: str, job_path: str) -> None:
             bullet_count=len(result.tailored_bullets),
         )
 
+        # Save to database if requested
+        if save:
+            await _maybe_save_result(result)
+
     except Exception as exc:
         print(f"\n  LLM tailoring failed: {exc}", file=sys.stderr)
         print("  Skill gap analysis (above) still valid.\n")
+
+
+async def _maybe_save_result(result: "TailoringResult") -> None:
+    """Save tailoring result to DB if data/ceal.db exists."""
+    from pathlib import Path
+
+    db_path = Path("data/ceal.db")
+    if not db_path.exists():
+        print("  No database found (data/ceal.db). Skipping save.")
+        return
+
+    try:
+        from src.tailoring.persistence import save_tailoring_result
+        request_id = await save_tailoring_result(result)
+        print(f"  Result saved to database (request_id={request_id})")
+    except Exception as exc:
+        print(f"  Failed to save result: {exc}", file=sys.stderr)

@@ -568,6 +568,11 @@ async def _async_main() -> None:
         type=str,
         help="Path to job description text file (used with --demo)",
     )
+    parser.add_argument(
+        "--save",
+        action="store_true",
+        help="Save tailoring results to database (used with --demo)",
+    )
 
     args = parser.parse_args()
 
@@ -576,7 +581,11 @@ async def _async_main() -> None:
         if not args.resume or not args.job:
             parser.error("--demo requires both --resume and --job")
         from src.demo import run_demo
-        await run_demo(resume_path=args.resume, job_path=args.job)
+        await run_demo(
+            resume_path=args.resume,
+            job_path=args.job,
+            save=getattr(args, "save", False),
+        )
         return
 
     if args.rank_only:

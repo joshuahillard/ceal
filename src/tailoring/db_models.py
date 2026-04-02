@@ -84,7 +84,7 @@ PHASE1_STUB_TABLES = {"job_listings", "resume_profiles"}
 
 def _utcnow() -> datetime.datetime:
     """Timezone-aware UTC timestamp for default column values."""
-    return datetime.datetime.now(datetime.UTC)
+    return datetime.datetime.now(datetime.timezone.utc)
 
 
 # ---------------------------------------------------------------------------
