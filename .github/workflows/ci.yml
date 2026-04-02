@@ -153,3 +153,39 @@ jobs:
 
       - name: Run tests with coverage
         run: pytest tests/ --cov=src --cov-report=term-missing --cov-fail-under=80
+
+  # -----------------------------------------------------------------------
+  # Stage 5: Docker Build Validation (depends on coverage passing)
+  # -----------------------------------------------------------------------
+  docker-build:
+    name: Docker Build Validation
+    runs-on: ubuntu-latest
+    needs: [coverage]
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t ceal:ci-${{ github.sha }} .
+
+      - name: Verify no secrets in image
+        run: |
+          # Check that no database files or .env leaked into the image
+          docker run --rm ceal:ci-${{ github.sha }} sh -c "find /app -name '*.db' -o -name '.env' -o -name '*.db-wal' | head -5" | tee /tmp/leaked_files
+          if [ -s /tmp/leaked_files ]; then
+            echo "ERROR: Secrets or database files found in Docker image!"
+            exit 1
+          fi
+
+      - name: Verify health endpoint starts
+        run: |
+          # Start container in background
+          docker run -d --name ceal-test -p 8000:8000 ceal:ci-${{ github.sha }}
+          # Wait for startup
+          sleep 5
+          # Check health endpoint
+          curl -f http://localhost:8000/health || (docker logs ceal-test && exit 1)
+          # Cleanup
+          docker stop ceal-test
+          docker rm ceal-test

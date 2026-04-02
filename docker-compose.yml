@@ -1,0 +1,23 @@
+# Céal — Local development with Docker
+# Usage: docker compose up --build
+# Access: http://localhost:8000
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - DATABASE_URL=sqlite+aiosqlite:///data/ceal.db
+      - PYTHONPATH=.
+    volumes:
+      # Persist SQLite database across container restarts
+      - ceal-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  ceal-data:
+    driver: local

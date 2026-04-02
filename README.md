@@ -57,7 +57,8 @@ Each stage runs as an independent `asyncio.Task`, communicating only through bou
 | `python-docx` | .docx resume export |
 | `fastapi` | Web UI framework with async route handlers |
 | `jinja2` | Server-side HTML templating |
-| `pytest` + `pytest-asyncio` | 202 unit and integration tests |
+| `uvicorn` | ASGI server for production deployment |
+| `pytest` + `pytest-asyncio` | 204+ unit and integration tests |
 
 ## Project Structure
 
@@ -94,6 +95,7 @@ ceal/
 │   │   ├── static/
 │   │   │   └── style.css        # Shared styles (Kanban, cards, badges)
 │   │   ├── routes/
+│   │   │   ├── health.py        # GET /health — Docker + Cloud Run health check
 │   │   │   ├── dashboard.py     # GET / — pipeline stats + CRM overview
 │   │   │   ├── jobs.py          # GET /jobs — ranked listings with filters
 │   │   │   ├── applications.py  # CRM Kanban board + status transitions
@@ -133,8 +135,14 @@ ceal/
 │   ├── resume.txt               # Candidate resume (plain text)
 │   └── sample_job.txt           # Sample job description for testing
 ├── config/
+├── deploy/
+│   └── cloudrun.sh              # GCP Cloud Run deployment script
+├── Dockerfile                   # Multi-stage Docker build (python:3.11-slim)
+├── docker-compose.yml           # Local development with persistent volume
+├── .dockerignore                # Excludes secrets, DB, dev artifacts from image
+├── .env.example                 # Environment variable documentation
 ├── .github/workflows/
-│   └── ci.yml                   # 6-job CI matrix (lint, unit/integration 3.11+3.12, coverage)
+│   └── ci.yml                   # 7-job CI matrix (lint, unit/integration 3.11+3.12, coverage, docker)
 └── pyproject.toml               # Ruff, pytest, coverage config
 ```
 
@@ -192,6 +200,42 @@ python -m src.main --batch --resume data/resume.txt
 python -m src.main --export 42
 ```
 
+## Docker
+
+### Local Development
+
+```bash
+# Build and run with docker compose
+docker compose up --build
+
+# Access at http://localhost:8000
+```
+
+### Manual Docker Build
+
+```bash
+# Build the image
+docker build -t ceal:latest .
+
+# Run with environment variables
+docker run -p 8000:8000 \
+  -e LLM_API_KEY=your-key-here \
+  -v ceal-data:/app/data \
+  ceal:latest
+```
+
+### GCP Cloud Run Deployment
+
+```bash
+# Set your GCP project
+export GCP_PROJECT_ID=your-project-id
+
+# Deploy (requires gcloud CLI)
+./deploy/cloudrun.sh
+```
+
+See `.env.example` for all configuration options.
+
 ## Database Schema
 
 Nine tables across two phases with referential integrity, audit columns, and trigger-based `updated_at` timestamps:
@@ -231,7 +275,7 @@ pytest tests/integration/ -v
 pytest tests/ --cov=src --cov-report=term-missing
 ```
 
-CI runs a 6-job matrix: lint, unit tests (Python 3.11 + 3.12), integration tests (3.11 + 3.12), and coverage (≥80% gate).
+CI runs a 7-job matrix: lint, unit tests (Python 3.11 + 3.12), integration tests (3.11 + 3.12), coverage (≥80% gate), and Docker build validation.
 
 ## Roadmap
 
@@ -239,6 +283,7 @@ CI runs a 6-job matrix: lint, unit tests (Python 3.11 + 3.12), integration tests
 - **Phase 2**: Resume tailoring — **complete**. Demo mode, batch processing, URL fetching, persistence layer, .docx export, skill gap detection, LLM-powered X-Y-Z bullet generation, prompt v1.1 with anti-keyword-stuffing.
 - **Phase 3**: Application tracking CRM — **complete**. Kanban board, state-machine status transitions, stale application reminders, tier-colored cards.
 - **Phase 4**: Auto-apply with approval queue — **complete**. Pre-fill engine with confidence scoring, 5-state approval lifecycle, field-by-field review, CRM sync on approval.
+- **Sprint 4**: Docker containerization + GCP Cloud Run deployment — **complete**. Multi-stage Dockerfile, health check endpoint, CI/CD docker validation, deployment script.
 
 ## License
 

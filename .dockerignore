@@ -1,0 +1,56 @@
+# Version control
+.git
+.gitignore
+
+# Python artifacts
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.eggs
+dist
+build
+
+# Virtual environments
+.venv
+env
+venv
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Test artifacts
+.pytest_cache
+.coverage
+htmlcov
+.mypy_cache
+.ruff_cache
+
+# Data — NEVER bake database or secrets into the image
+data/*.db
+data/*.db-wal
+data/*.db-shm
+.env
+.env.*
+
+# Documentation and sprint prompts (not needed in prod image)
+docs/
+*.md
+*.pdf
+*.pptx
+*.docx
+*.png
+LICENSE
+
+# Alembic migrations (run separately, not in container startup)
+alembic/
+alembic.ini
+
+# CI/CD config
+.github/
+
+# Test mocks and fixtures
+tests/mocks/
