@@ -579,6 +579,23 @@ async def _async_main() -> None:
         action="store_true",
         help="Save tailoring results to database (used with --demo)",
     )
+    parser.add_argument(
+        "--batch",
+        action="store_true",
+        help="Batch mode: tailor all ranked jobs in the database",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=20,
+        help="Max jobs to process in batch mode (default: 20)",
+    )
+    parser.add_argument(
+        "--min-score",
+        type=float,
+        default=0.5,
+        help="Minimum match score for batch mode (default: 0.5)",
+    )
 
     args = parser.parse_args()
 
@@ -608,6 +625,19 @@ async def _async_main() -> None:
             job_path=job_path,
             save=getattr(args, "save", False),
         )
+        return
+
+    # Batch mode — tailor all ranked jobs in DB
+    if args.batch:
+        if not args.resume:
+            parser.error("--batch requires --resume")
+        from src.batch import run_batch_tailoring
+        stats = await run_batch_tailoring(
+            resume_path=args.resume,
+            limit=args.limit,
+            min_score=args.min_score,
+        )
+        print(f"\n  Batch complete: {stats}")
         return
 
     if args.rank_only:
