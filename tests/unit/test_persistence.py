@@ -31,6 +31,17 @@ from src.tailoring.persistence import (
     save_tailoring_result,
 )
 
+
+def _drop_all_tables(sync_conn):
+    """Drop all tables via raw SQL for clean test isolation."""
+    from sqlalchemy import inspect
+    from sqlalchemy import text as sa_text
+
+    inspector = inspect(sync_conn)
+    tables = inspector.get_table_names()
+    for table in tables:
+        sync_conn.execute(sa_text(f"DROP TABLE IF EXISTS [{table}]"))  # noqa: S608
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -38,6 +49,9 @@ from src.tailoring.persistence import (
 @pytest_asyncio.fixture(autouse=True)
 async def setup_db():
     """Initialize Phase 1 schema + Phase 2 ORM tables for each test."""
+    # Drop all tables first to ensure clean state across test files
+    async with engine.begin() as conn:
+        await conn.run_sync(_drop_all_tables)
     # Phase 1 tables (from schema.sql)
     await init_db()
     # Phase 2 tables (from ORM metadata)
