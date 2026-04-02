@@ -608,8 +608,30 @@ async def _async_main() -> None:
         default="output",
         help="Directory for exported .docx files (default: output/)",
     )
+    parser.add_argument(
+        "--web",
+        action="store_true",
+        help="Launch the web UI (default: http://localhost:8000)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Port for web UI (default: 8000)",
+    )
 
     args = parser.parse_args()
+
+    # Web UI mode
+    if args.web:
+        import uvicorn
+
+        from src.web.app import create_app
+        web_app = create_app()
+        config = uvicorn.Config(web_app, host="0.0.0.0", port=args.port, log_level="info")
+        server = uvicorn.Server(config)
+        await server.serve()
+        return
 
     # Demo mode — separate pipeline, no DB needed
     if args.demo:

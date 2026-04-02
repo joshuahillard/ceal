@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Céal{% endblock %}
+
+{% block content %}
+<h1>Pipeline Dashboard</h1>
+
+<div class="card-grid">
+    <div class="card">
+        <h3>Jobs by Status</h3>
+        {% if stats.jobs_by_status %}
+        <table class="table-compact">
+            {% for status, count in stats.jobs_by_status.items() %}
+            <tr>
+                <td>{{ status }}</td>
+                <td class="text-right"><strong>{{ count }}</strong></td>
+            </tr>
+            {% endfor %}
+        </table>
+        {% else %}
+        <p class="muted">No jobs in pipeline yet.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h3>Jobs by Tier</h3>
+        {% if stats.jobs_by_tier %}
+        <table class="table-compact">
+            {% for tier_key, count in stats.jobs_by_tier.items() %}
+            <tr>
+                <td>
+                    {% if tier_key == "tier_1" %}Tier 1: Apply Now
+                    {% elif tier_key == "tier_2" %}Tier 2: Credential
+                    {% elif tier_key == "tier_3" %}Tier 3: Campaign
+                    {% else %}{{ tier_key }}
+                    {% endif %}
+                </td>
+                <td class="text-right"><strong>{{ count }}</strong></td>
+            </tr>
+            {% endfor %}
+        </table>
+        {% else %}
+        <p class="muted">No tiers assigned yet.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h3>Match Score</h3>
+        {% if stats.avg_match_score is not none %}
+        <div class="stat-large">{{ "%.0f" | format(stats.avg_match_score * 100) }}%</div>
+        <p class="muted">average across {{ stats.total_ranked }} ranked jobs</p>
+        {% else %}
+        <p class="muted">No jobs ranked yet.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h3>Total Ranked</h3>
+        <div class="stat-large">{{ stats.total_ranked }}</div>
+        <p class="muted">jobs scored by LLM</p>
+    </div>
+</div>
+
+{% if stats.latest_scrape %}
+<div class="card" style="margin-top: 1.5rem;">
+    <h3>Latest Scrape</h3>
+    <table class="table-compact">
+        <tr><td>Source</td><td>{{ stats.latest_scrape.source }}</td></tr>
+        <tr><td>Query</td><td>{{ stats.latest_scrape.query_term }}</td></tr>
+        <tr><td>Jobs Found</td><td>{{ stats.latest_scrape.jobs_found }}</td></tr>
+        <tr><td>New Jobs</td><td>{{ stats.latest_scrape.jobs_new }}</td></tr>
+        <tr><td>Completed</td><td>{{ stats.latest_scrape.completed_at }}</td></tr>
+    </table>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Demo — Céal{% endblock %}
+
+{% block content %}
+<h1>Demo Mode</h1>
+<p class="muted">Run the tailoring pipeline on a single resume + job description.</p>
+
+<form method="post" action="/demo">
+    <div class="form-group">
+        <label for="resume_text">Resume</label>
+        <textarea id="resume_text" name="resume_text" rows="15" required>{{ resume_text }}</textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="job_description">Job Description</label>
+        <textarea id="job_description" name="job_description" rows="10"
+            placeholder="Paste the job description here...">{% if results %}{{ results.job_description }}{% endif %}</textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="job_url">Or fetch from URL</label>
+        <input type="url" id="job_url" name="job_url"
+               placeholder="https://boards.greenhouse.io/..."
+               value="{% if results %}{{ results.job_url }}{% endif %}">
+    </div>
+
+    <div class="form-group">
+        <label for="target_tier">Target Tier</label>
+        <select id="target_tier" name="target_tier">
+            <option value="1" {% if results and results.target_tier == 1 %}selected{% endif %}>1 — Apply Now</option>
+            <option value="2" {% if results and results.target_tier == 2 %}selected{% endif %}>2 — Credential Building</option>
+            <option value="3" {% if results and results.target_tier == 3 %}selected{% endif %}>3 — Campaign Target</option>
+        </select>
+    </div>
+
+    <button type="submit" class="btn">Run Tailoring</button>
+</form>
+
+{% if results %}
+<hr>
+
+{% if results.errors %}
+<div class="alert alert-error">
+    {% for error in results.errors %}
+    <p>{{ error }}</p>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if results.skill_gaps %}
+<h2>Skill Gap Analysis</h2>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Skill</th>
+            <th>Category</th>
+            <th>Job Requires</th>
+            <th>Resume Has</th>
+            <th>Proficiency</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for gap in results.skill_gaps %}
+        <tr>
+            <td>{{ gap.skill_name }}</td>
+            <td>{{ gap.category.value }}</td>
+            <td>{% if gap.job_requires %}Yes{% else %}No{% endif %}</td>
+            <td>{% if gap.resume_has %}Yes{% else %}No{% endif %}</td>
+            <td>{{ gap.proficiency.value if gap.proficiency else "—" }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+{% if results.tailored_bullets %}
+<h2>Tailored Bullets</h2>
+{% for bullet in results.tailored_bullets %}
+<div class="card" style="margin-bottom: 1rem;">
+    <p><strong>Original:</strong> {{ bullet.original }}</p>
+    <p><strong>Rewritten:</strong> {{ bullet.rewritten_text }}</p>
+    <p>
+        <span class="badge {% if bullet.relevance_score >= 0.7 %}badge-green{% elif bullet.relevance_score >= 0.5 %}badge-yellow{% else %}badge-red{% endif %}">
+            {{ "%.0f" | format(bullet.relevance_score * 100) }}% relevant
+        </span>
+        {% if bullet.xyz_format %}
+        <span class="badge badge-green">X-Y-Z</span>
+        {% endif %}
+    </p>
+</div>
+{% endfor %}
+{% elif not results.has_api_key and not results.errors %}
+<div class="alert alert-warning">
+    No LLM_API_KEY configured. Showing skill gap analysis only.
+    Set LLM_API_KEY in .env to enable bullet tailoring.
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

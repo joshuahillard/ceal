@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Jobs — Céal{% endblock %}
+
+{% block content %}
+<h1>Job Listings</h1>
+
+<form class="filter-bar" method="get" action="/jobs">
+    <label>
+        Min Score
+        <input type="range" name="min_score" min="0" max="1" step="0.05"
+               value="{{ filters.min_score }}"
+               oninput="this.nextElementSibling.textContent = Math.round(this.value * 100) + '%'">
+        <span>{{ "%.0f" | format(filters.min_score * 100) }}%</span>
+    </label>
+    <label>
+        Tier
+        <select name="tier">
+            <option value="">All</option>
+            <option value="1" {% if filters.tier == 1 %}selected{% endif %}>Tier 1: Apply Now</option>
+            <option value="2" {% if filters.tier == 2 %}selected{% endif %}>Tier 2: Credential</option>
+            <option value="3" {% if filters.tier == 3 %}selected{% endif %}>Tier 3: Campaign</option>
+        </select>
+    </label>
+    <label>
+        Limit
+        <input type="number" name="limit" min="1" max="200" value="{{ filters.limit }}">
+    </label>
+    <button type="submit" class="btn">Filter</button>
+</form>
+
+{% if jobs %}
+<table class="table">
+    <thead>
+        <tr>
+            <th>Score</th>
+            <th>Title</th>
+            <th>Company</th>
+            <th>Tier</th>
+            <th>Location</th>
+            <th>Remote</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for job in jobs %}
+        <tr>
+            <td>
+                {% set score_pct = (job.match_score * 100) | round | int if job.match_score else 0 %}
+                <span class="badge {% if score_pct >= 70 %}badge-green{% elif score_pct >= 50 %}badge-yellow{% else %}badge-red{% endif %}">
+                    {{ score_pct }}%
+                </span>
+            </td>
+            <td>{{ job.title }}</td>
+            <td>
+                {% if job.url %}
+                <a href="{{ job.url }}" target="_blank" rel="noopener">{{ job.company_name }}</a>
+                {% else %}
+                {{ job.company_name }}
+                {% endif %}
+            </td>
+            <td>{{ job.company_tier or "—" }}</td>
+            <td>{{ job.location or "—" }}</td>
+            <td>{{ job.remote_type or "—" }}</td>
+            <td>{{ job.status }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="empty-state">
+    <p>No jobs match the current filters.</p>
+    <p class="muted">Try lowering the minimum score or removing the tier filter.</p>
+</div>
+{% endif %}
+{% endblock %}

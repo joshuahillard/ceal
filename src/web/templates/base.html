@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Céal{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <nav class="nav">
+        <div class="nav-brand">Céal</div>
+        <div class="nav-links">
+            <a href="/">Dashboard</a>
+            <a href="/jobs">Jobs</a>
+            <a href="/demo">Demo</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        Céal v2.1 — Career Signal Engine
+    </footer>
+</body>
+</html>
