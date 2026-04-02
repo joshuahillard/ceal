@@ -942,3 +942,86 @@ async def get_application_stats() -> dict:
             """)
         )
         return {row[0]: row[1] for row in result}
+
+
+# ---------------------------------------------------------------------------
+# Document Templates & Generated Documents
+# ---------------------------------------------------------------------------
+
+async def save_document_template(doc_type: str, filename: str, file_blob: bytes, content_type: str) -> int:
+    """Upsert a document template (one per doc_type)."""
+    async with get_session() as session:
+        result = await session.execute(
+            text("""
+                INSERT INTO document_templates (doc_type, filename, file_blob, content_type)
+                VALUES (:doc_type, :filename, :file_blob, :content_type)
+                ON CONFLICT(doc_type) DO UPDATE SET
+                    filename = :filename,
+                    file_blob = :file_blob,
+                    content_type = :content_type,
+                    uploaded_at = datetime('now')
+                RETURNING id
+            """),
+            {"doc_type": doc_type, "filename": filename, "file_blob": file_blob, "content_type": content_type},
+        )
+        return result.scalar_one()
+
+
+async def get_document_template(doc_type: str) -> dict | None:
+    """Get a document template by type."""
+    async with get_session() as session:
+        result = await session.execute(
+            text("SELECT id, doc_type, filename, file_blob, content_type, uploaded_at FROM document_templates WHERE doc_type = :doc_type"),
+            {"doc_type": doc_type},
+        )
+        row = result.first()
+        return dict(row._mapping) if row else None
+
+
+async def get_all_document_templates() -> list[dict]:
+    """Get all uploaded document templates (without blobs for listing)."""
+    async with get_session() as session:
+        result = await session.execute(
+            text("SELECT id, doc_type, filename, content_type, uploaded_at FROM document_templates ORDER BY doc_type")
+        )
+        return [dict(row._mapping) for row in result]
+
+
+async def save_generated_document(application_id: int, doc_type: str, filename: str, file_blob: bytes, content_type: str) -> int:
+    """Upsert a generated document for an application."""
+    async with get_session() as session:
+        result = await session.execute(
+            text("""
+                INSERT INTO generated_documents (application_id, doc_type, filename, file_blob, content_type)
+                VALUES (:app_id, :doc_type, :filename, :file_blob, :content_type)
+                ON CONFLICT(application_id, doc_type) DO UPDATE SET
+                    filename = :filename,
+                    file_blob = :file_blob,
+                    content_type = :content_type,
+                    generated_at = datetime('now')
+                RETURNING id
+            """),
+            {"app_id": application_id, "doc_type": doc_type, "filename": filename, "file_blob": file_blob, "content_type": content_type},
+        )
+        return result.scalar_one()
+
+
+async def get_generated_documents(application_id: int) -> list[dict]:
+    """Get generated documents for an application (without blobs for listing)."""
+    async with get_session() as session:
+        result = await session.execute(
+            text("SELECT id, application_id, doc_type, filename, content_type, generated_at FROM generated_documents WHERE application_id = :app_id ORDER BY doc_type"),
+            {"app_id": application_id},
+        )
+        return [dict(row._mapping) for row in result]
+
+
+async def get_generated_document(doc_id: int) -> dict | None:
+    """Get a single generated document with its blob."""
+    async with get_session() as session:
+        result = await session.execute(
+            text("SELECT id, application_id, doc_type, filename, file_blob, content_type, generated_at FROM generated_documents WHERE id = :doc_id"),
+            {"doc_id": doc_id},
+        )
+        row = result.first()
+        return dict(row._mapping) if row else None

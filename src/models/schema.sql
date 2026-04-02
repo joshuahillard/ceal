@@ -218,4 +218,31 @@ CREATE TRIGGER IF NOT EXISTS trg_applications_updated_at
     FOR EACH ROW
 BEGIN
     UPDATE applications SET updated_at = datetime('now') WHERE id = OLD.id;
-END
+END;
+
+-- ---------------------------------------------------------------------------
+-- Document Templates & Generated Documents
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS document_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    doc_type TEXT NOT NULL CHECK(doc_type IN ('resume', 'cover_letter')),
+    filename TEXT NOT NULL,
+    file_blob BLOB NOT NULL,
+    content_type TEXT NOT NULL DEFAULT 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    uploaded_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(doc_type)  -- Only one template per type
+);
+
+CREATE TABLE IF NOT EXISTS generated_documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    application_id INTEGER NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+    doc_type TEXT NOT NULL CHECK(doc_type IN ('resume', 'cover_letter')),
+    filename TEXT NOT NULL,
+    file_blob BLOB NOT NULL,
+    content_type TEXT NOT NULL DEFAULT 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    generated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(application_id, doc_type)  -- One generated doc per type per application
+);
+
+CREATE INDEX IF NOT EXISTS idx_generated_docs_app_id ON generated_documents(application_id)
