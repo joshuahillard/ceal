@@ -42,7 +42,7 @@ async def save_tailoring_result(result: TailoringResult) -> int:
         req = result.request
         emphasis_json = json.dumps(req.emphasis_areas) if req.emphasis_areas else None
 
-        row = await session.execute(
+        await session.execute(
             text("""
                 INSERT INTO tailoring_requests (job_id, profile_id, target_tier, emphasis_areas, created_at)
                 VALUES (:job_id, :profile_id, :target_tier, :emphasis_areas, :created_at)

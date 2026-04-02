@@ -7,11 +7,8 @@ into structured ParsedResume with sections, bullets, skills, and metrics.
 Persona: [QA Lead] — parsing accuracy, contract verification
 """
 
-import pytest
-
 from src.tailoring.models import ParsedResume, ResumeSection
 from src.tailoring.resume_parser import ResumeProfileParser
-
 
 SAMPLE_RESUME = """
 PROFESSIONAL SUMMARY

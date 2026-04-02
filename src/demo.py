@@ -10,7 +10,6 @@ Usage:
 """
 from __future__ import annotations
 
-import asyncio
 import datetime
 import os
 import sys
@@ -18,7 +17,7 @@ import sys
 from dotenv import load_dotenv
 
 from src.models.entities import JobListing, JobSource, JobStatus, RemoteType
-from src.tailoring.models import SkillGap, TailoredBullet, TailoringRequest
+from src.tailoring.models import SkillGap, TailoredBullet, TailoringRequest, TailoringResult
 from src.tailoring.resume_parser import ResumeProfileParser
 from src.tailoring.skill_extractor import SkillOverlapAnalyzer
 
@@ -175,7 +174,7 @@ async def run_demo(
         print("  Skill gap analysis (above) still valid.\n")
 
 
-async def _maybe_save_result(result: "TailoringResult") -> None:
+async def _maybe_save_result(result: TailoringResult) -> None:
     """Save tailoring result to DB if data/ceal.db exists."""
     from pathlib import Path
 

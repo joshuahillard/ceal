@@ -9,8 +9,6 @@ Persona: [QA Lead] — gap analysis accuracy, contract verification
 
 import datetime
 
-import pytest
-
 from src.models.entities import JobListing, JobSource, JobStatus, RemoteType
 from src.tailoring.models import SkillGap
 from src.tailoring.skill_extractor import SkillOverlapAnalyzer

@@ -14,6 +14,8 @@ import pytest_asyncio
 # Override DATABASE_URL BEFORE importing database module
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite://"
 
+from sqlalchemy import text
+
 from src.models.database import engine, get_session, init_db
 from src.models.entities import Proficiency, SkillCategory
 from src.tailoring.db_models import Base
@@ -28,9 +30,6 @@ from src.tailoring.persistence import (
     list_tailored_jobs,
     save_tailoring_result,
 )
-
-from sqlalchemy import text
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

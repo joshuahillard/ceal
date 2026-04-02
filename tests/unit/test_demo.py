@@ -79,7 +79,6 @@ class TestDemoSkillGapAnalysis:
 
     def test_demo_skill_gap_analysis_offline(self):
         """Skill gap analysis detects overlaps and gaps correctly."""
-        now = datetime.datetime.now(datetime.timezone.utc)
         job = _build_demo_job(
             "Requirements: Experience with Python, SQL, and REST APIs. "
             "Familiarity with cloud infrastructure (AWS, GCP)."
