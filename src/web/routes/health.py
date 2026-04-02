@@ -33,7 +33,7 @@ async def health_check():
     try:
         async with get_session() as session:
             result = await session.execute(__import__("sqlalchemy").text("SELECT 1"))
-            await result.scalar()
+            result.scalar()
         status["database"] = "connected"
     except Exception as e:
         logger.warning("health_check_db_failed", extra={"error": str(e)})
