@@ -17,7 +17,7 @@ from src.tailoring.skill_extractor import SkillOverlapAnalyzer
 
 def _make_test_job() -> JobListing:
     """Creates a minimal valid JobListing for testing."""
-    now = datetime.datetime.now(datetime.UTC)
+    now = datetime.datetime.now(datetime.timezone.utc)
     return JobListing(
         id=1,
         external_id="stripe-123",
