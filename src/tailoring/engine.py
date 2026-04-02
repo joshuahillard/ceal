@@ -166,10 +166,16 @@ Return ONLY the JSON array, no markdown fences, no explanation."""
 
         results: list[TailoredBullet] = []
         for item in items:
+            text = item.get("rewritten_text", "").lower()
+            # Don't trust the LLM's xyz_format claim — verify against actual text.
+            # The model sometimes marks True when "by doing [Z]" is missing.
+            xyz_claimed = item.get("xyz_format", False)
+            xyz_verified = xyz_claimed and "measured by" in text and "by doing" in text
+
             results.append(TailoredBullet(
                 original=item["original"],
                 rewritten_text=item["rewritten_text"],
-                xyz_format=item.get("xyz_format", False),
+                xyz_format=xyz_verified,
                 relevance_score=max(0.0, min(1.0, float(item.get("relevance_score", 0.5)))),
             ))
 
