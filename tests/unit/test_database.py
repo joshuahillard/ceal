@@ -64,10 +64,12 @@ def engine_drop_all(sync_conn):
     from sqlalchemy import inspect
     from sqlalchemy import text as sa_text
 
+    sync_conn.execute(sa_text("PRAGMA foreign_keys=OFF"))
     inspector = inspect(sync_conn)
     tables = inspector.get_table_names()
     for table in tables:
         sync_conn.execute(sa_text(f"DROP TABLE IF EXISTS [{table}]"))  # noqa: S608
+    sync_conn.execute(sa_text("PRAGMA foreign_keys=ON"))
 
 
 def _make_job(
