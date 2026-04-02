@@ -470,7 +470,7 @@ async def get_top_matches(
                        remote_type, salary_min, salary_max, status
                 FROM job_listings
                 WHERE match_score >= :min_score
-                  AND status IN ('ranked', 'scraped')
+                  AND status != 'archived'
                   {tier_clause}
                 ORDER BY match_score DESC, company_tier ASC
                 LIMIT :limit
@@ -641,7 +641,7 @@ VALID_TRANSITIONS: dict[str, set[str]] = {
     "interviewing": {"offer", "rejected", "archived"},
     "offer": {"archived"},
     "rejected": {"archived"},
-    "archived": set(),  # Terminal state
+    "archived": {"ranked"},  # Can restore to ranked for re-evaluation
 }
 
 

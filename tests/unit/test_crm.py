@@ -46,8 +46,8 @@ class TestValidTransitions:
     def test_scraped_cannot_skip_to_offer(self):
         assert "offer" not in VALID_TRANSITIONS["scraped"]
 
-    def test_archived_is_terminal(self):
-        assert VALID_TRANSITIONS["archived"] == set()
+    def test_archived_can_restore_to_ranked(self):
+        assert VALID_TRANSITIONS["archived"] == {"ranked"}
 
     def test_all_statuses_have_transition_entry(self):
         expected = {"scraped", "ranked", "applied", "responded", "interviewing", "offer", "rejected", "archived"}

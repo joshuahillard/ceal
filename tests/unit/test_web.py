@@ -51,7 +51,11 @@ class TestDashboard:
             "total_ranked": 5,
             "latest_scrape": None,
         }
-        with patch("src.web.routes.dashboard.get_pipeline_stats", new_callable=AsyncMock, return_value=mock_stats):
+        with (
+            patch("src.web.routes.dashboard.get_pipeline_stats", new_callable=AsyncMock, return_value=mock_stats),
+            patch("src.web.routes.dashboard.get_application_summary", new_callable=AsyncMock, return_value={"ranked": 5}),
+            patch("src.web.routes.dashboard.get_stale_applications", new_callable=AsyncMock, return_value=[]),
+        ):
             response = await client.get("/")
         assert response.status_code == 200
         assert "Pipeline Dashboard" in response.text
@@ -67,7 +71,11 @@ class TestDashboard:
             "total_ranked": 0,
             "latest_scrape": None,
         }
-        with patch("src.web.routes.dashboard.get_pipeline_stats", new_callable=AsyncMock, return_value=mock_stats):
+        with (
+            patch("src.web.routes.dashboard.get_pipeline_stats", new_callable=AsyncMock, return_value=mock_stats),
+            patch("src.web.routes.dashboard.get_application_summary", new_callable=AsyncMock, return_value={}),
+            patch("src.web.routes.dashboard.get_stale_applications", new_callable=AsyncMock, return_value=[]),
+        ):
             response = await client.get("/")
         assert response.status_code == 200
         assert "No jobs in pipeline yet" in response.text

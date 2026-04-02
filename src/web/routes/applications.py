@@ -22,7 +22,7 @@ async def kanban_board(request: Request):
 
     # Fetch jobs for each active column
     columns = {}
-    for status in ["scraped", "ranked", "applied", "responded", "interviewing", "offer", "rejected"]:
+    for status in ["scraped", "ranked", "applied", "responded", "interviewing", "offer", "rejected", "archived"]:
         if summary.get(status, 0) > 0:
             columns[status] = await get_jobs_by_status(status, limit=50)
         else:
@@ -55,7 +55,7 @@ async def update_status(
     except ValueError as e:
         summary = await get_application_summary()
         columns = {}
-        for status in ["scraped", "ranked", "applied", "responded", "interviewing", "offer", "rejected"]:
+        for status in ["scraped", "ranked", "applied", "responded", "interviewing", "offer", "rejected", "archived"]:
             columns[status] = await get_jobs_by_status(status, limit=50) if summary.get(status, 0) > 0 else []
         stale = await get_stale_applications(days=7)
 

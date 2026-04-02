@@ -17,7 +17,7 @@
 </div>
 
 <div class="kanban-board">
-    {% for status in ["ranked", "applied", "responded", "interviewing", "offer", "rejected"] %}
+    {% for status in ["ranked", "applied", "responded", "interviewing", "offer", "rejected", "archived"] %}
     <div class="kanban-column">
         <div class="kanban-column-header">
             <span>{{ status | title }}</span>
@@ -47,7 +47,8 @@
                     "responded": ["interviewing", "rejected", "archived"],
                     "interviewing": ["offer", "rejected", "archived"],
                     "offer": ["archived"],
-                    "rejected": ["archived"]
+                    "rejected": ["archived"],
+                    "archived": ["ranked"]
                 } %}
                 {% for next_status in transitions.get(status, []) %}
                 <form method="post" action="/applications/{{ job.id }}/status" style="display: inline;">
