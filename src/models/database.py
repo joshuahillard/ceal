@@ -469,7 +469,7 @@ async def get_top_matches(
                        match_score, match_reasoning, url, location,
                        remote_type, salary_min, salary_max, status
                 FROM job_listings
-                WHERE match_score >= :min_score
+                WHERE (match_score >= :min_score OR match_score IS NULL)
                   AND status != 'archived'
                   {tier_clause}
                 ORDER BY match_score DESC, company_tier ASC
