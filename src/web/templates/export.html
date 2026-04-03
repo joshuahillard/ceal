@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Export PDF — Ceal{% endblock %}
+
+{% block content %}
+<h1>Export Documents</h1>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+<p><a href="/jobs">Back to Jobs</a></p>
+{% elif job %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3>{{ job.title }}</h3>
+    <table class="table-compact">
+        <tr><td class="muted">Company</td><td>{{ job.company_name }}</td></tr>
+        <tr><td class="muted">Tier</td><td>{{ job.company_tier or "Unclassified" }}</td></tr>
+        <tr>
+            <td class="muted">Match Score</td>
+            <td>
+                {% if job.match_score %}
+                    {% set score_pct = (job.match_score * 100) | round | int %}
+                    <span class="badge {% if score_pct >= 70 %}badge-green{% elif score_pct >= 50 %}badge-yellow{% else %}badge-red{% endif %}">
+                        {{ score_pct }}%
+                    </span>
+                {% else %}
+                    —
+                {% endif %}
+            </td>
+        </tr>
+        {% if job.url %}
+        <tr><td class="muted">Listing</td><td><a href="{{ job.url }}" target="_blank" rel="noopener">View Job</a></td></tr>
+        {% endif %}
+    </table>
+</div>
+
+<div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+    <form method="post" action="/export/{{ job.id }}/resume">
+        <button type="submit" class="btn">Download Resume PDF</button>
+    </form>
+    <form method="post" action="/export/{{ job.id }}/cover-letter">
+        <button type="submit" class="btn" style="background: #5DADE2;">Download Cover Letter PDF</button>
+    </form>
+</div>
+
+<p style="margin-top: 1.5rem;"><a href="/jobs">Back to Jobs</a></p>
+{% else %}
+<div class="empty-state">
+    <p>No job selected for export.</p>
+    <p><a href="/jobs">Browse Jobs</a></p>
+</div>
+{% endif %}
+{% endblock %}

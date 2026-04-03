@@ -39,6 +39,7 @@
             <th>Location</th>
             <th>Remote</th>
             <th>Status</th>
+            <th>Export</th>
             <th>Apply</th>
         </tr>
     </thead>
@@ -63,6 +64,9 @@
             <td>{{ job.location or "—" }}</td>
             <td>{{ job.remote_type or "—" }}</td>
             <td>{{ job.status }}</td>
+            <td>
+                <a href="/export/{{ job.id }}" class="prefill-btn" style="text-decoration:none; background:#5DADE2;">PDF</a>
+            </td>
             <td>
                 <form method="post" action="/apply/prefill/{{ job.id }}" style="display:inline">
                     <button type="submit" class="prefill-btn">Pre-Fill</button>

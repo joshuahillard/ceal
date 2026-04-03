@@ -50,10 +50,11 @@ def create_app() -> FastAPI:
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
     # Register route modules
-    from src.web.routes import applications, apply, dashboard, demo, health, jobs
+    from src.web.routes import applications, apply, dashboard, demo, export, health, jobs
     app.include_router(applications.router)
     app.include_router(apply.router)
     app.include_router(dashboard.router)
+    app.include_router(export.router)
     app.include_router(jobs.router)
     app.include_router(demo.router)
     app.include_router(health.router)
