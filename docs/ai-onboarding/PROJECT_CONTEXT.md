@@ -24,11 +24,11 @@ Céal (pronounced "KAYL") is an AI-powered career signal engine built by Josh Hi
 - **Framework**: FastAPI (async), SQLAlchemy (async), Pydantic v2
 - **Database**: Polymorphic — SQLite (dev/test) + PostgreSQL (production via Cloud SQL)
 - **Deployment**: Docker + GCP Cloud Run
-- **Tests**: pytest with `asyncio_mode = "strict"`, 179+ passing
+- **Tests**: pytest with `asyncio_mode = "strict"`, 220+ passing
 - **Lint**: ruff (`py310`, line-length 120)
 - **CI**: GitHub Actions (lint → unit → integration → coverage → docker-build → db-tests-postgres)
 
-## Current Architecture (post-Sprint 6)
+## Current Architecture (post-Sprint 8)
 
 ```
 ceal/
@@ -38,12 +38,14 @@ ceal/
 │   ├── demo.py                  # Offline demo mode
 │   ├── export.py                # .docx resume export
 │   ├── fetcher.py               # Secure URL fetcher
+│   ├── apply/
+│   │   └── prefill.py           # Deterministic ATS prefill engine
 │   ├── models/
 │   │   ├── compat.py            # Backend detection (is_sqlite/is_postgres)
 │   │   ├── database.py          # All DB operations, engine factory
 │   │   ├── entities.py          # Pydantic models + enums
-│   │   ├── schema.sql           # SQLite DDL (11 tables)
-│   │   └── schema_postgres.sql  # PostgreSQL DDL (11 tables)
+│   │   ├── schema.sql           # SQLite DDL (13 tables)
+│   │   └── schema_postgres.sql  # PostgreSQL DDL (13 tables)
 │   ├── normalizer/
 │   │   └── pipeline.py          # HTML → clean text normalizer
 │   ├── ranker/
@@ -59,17 +61,19 @@ ceal/
 │   │   ├── resume_parser.py     # Resume → ParsedBullet extraction
 │   │   └── skill_extractor.py   # Skill overlap analysis
 │   └── web/
-│       ├── app.py               # FastAPI factory (4 routers)
+│       ├── app.py               # FastAPI factory (6 routers)
 │       ├── routes/
 │       │   ├── dashboard.py     # GET / — pipeline stats
 │       │   ├── jobs.py          # GET /jobs — ranked listings
 │       │   ├── demo.py          # GET/POST /demo — tailoring demo
+│       │   ├── applications.py  # GET /applications — CRM Kanban + reminders
+│       │   ├── apply.py         # GET/POST /apply — approval queue + review
 │       │   └── health.py        # GET /health — DB probe
 │       ├── static/style.css
 │       └── templates/           # Jinja2 HTML templates
 ├── tests/
-│   ├── unit/                    # 15 test files, mock-based
-│   └── integration/             # Pipeline + persistence round-trip
+│   ├── unit/                    # 17 test files, mock-based
+│   └── integration/             # 4 round-trip / pipeline integration files
 ├── data/
 │   ├── resume.txt               # Josh's resume (parser-compatible)
 │   └── sample_job.txt           # Test job listing
@@ -97,20 +101,22 @@ ceal/
 | Semantic Fidelity Guardrail v1.1 | ✅ Shipped | Rejects hallucinated metrics/drift |
 | Sprint 1 (Web UI) | ✅ Shipped | Dashboard, Jobs, Demo routes |
 | Sprint 6 (Docker + Cloud SQL) | ✅ Shipped | Polymorphic DB, health endpoint |
-| **Sprint 2 (CRM)** | ❌ **MISSING** | Applications, Kanban, state machine, stale reminders |
-| **Sprint 3 (Auto-Apply)** | ❌ **MISSING** | Prefill engine, approval queue, confidence scoring |
-| Sprint 8 (future) | 📋 Planned | Reimplement CRM + Auto-Apply |
-| Vertex AI integration | 📋 Planned | Regime classification for prompt A/B testing |
+| Sprint 2 (CRM) | ✅ Shipped | Applications route, Kanban board, job state machine, stale reminders |
+| Sprint 3 (Auto-Apply) | ✅ Shipped | Prefill engine, approval queue, review screen, confidence scoring |
+| Sprint 8 | ✅ Shipped | Reimplemented CRM + Auto-Apply on the recovered Sprint 6 baseline |
+| Sprint 9 | 📋 Planned | Vertex AI regime classification for prompt A/B testing |
 
-**Why are Sprints 2-3 missing?** On April 2, 2026, `main` was reset to the `codex/semantic-fidelity-guardrail` branch to fix schema issues. This lost the CRM and Auto-Apply implementations. Sprint 6 reimplemented Docker + Cloud SQL on the new baseline. The old reference code with CRM/Auto-Apply is preserved at `C:\Users\joshb\Documents\GitHub\ceal\` on Josh's machine.
+**Branch reset recovery note:** On April 2, 2026, `main` was reset to the `codex/semantic-fidelity-guardrail` branch to fix schema issues. That temporarily removed CRM and Auto-Apply from `main`. Sprint 6 reimplemented Docker + Cloud SQL on the recovered baseline, and Sprint 8 reimplemented CRM + Auto-Apply using the preserved reference copy at `C:\Users\joshb\Documents\GitHub\ceal\`.
 
-## Database Schema (11 tables)
+## Database Schema (13 tables)
 
 **Phase 1 (7 tables)**: `job_listings`, `skills`, `job_skills`, `resume_profiles`, `resume_skills`, `scrape_log`, `company_tiers`
 
 **Phase 2 (4 tables)**: `parsed_bullets`, `tailoring_requests`, `tailored_bullets`, `skill_gaps`
 
-Both `schema.sql` (SQLite) and `schema_postgres.sql` (PostgreSQL) contain all 11 tables with matching constraints.
+**Phase 4 / CRM + Auto-Apply (2 tables)**: `applications`, `application_fields`
+
+Both `schema.sql` (SQLite) and `schema_postgres.sql` (PostgreSQL) contain all 13 tables with matching constraints.
 
 ## Target Roles (Why This Exists)
 
