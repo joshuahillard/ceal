@@ -153,3 +153,61 @@ jobs:
 
       - name: Run tests with coverage
         run: pytest tests/ --cov=src --cov-report=term-missing --cov-fail-under=80
+
+  # -----------------------------------------------------------------------
+  # Stage 5: Docker Build (verify image builds successfully)
+  # -----------------------------------------------------------------------
+  docker-build:
+    name: "Docker Build"
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t ceal:ci-test .
+
+      - name: Verify image
+        run: docker image inspect ceal:ci-test --format '{{.Size}}'
+
+  # -----------------------------------------------------------------------
+  # Stage 6: PostgreSQL Database Tests
+  # -----------------------------------------------------------------------
+  db-tests-postgres:
+    name: "DB Tests (PostgreSQL)"
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ceal_test
+          POSTGRES_USER: ceal
+          POSTGRES_PASSWORD: ceal_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run database tests against PostgreSQL
+        env:
+          DATABASE_URL: "postgresql+asyncpg://ceal:ceal_ci@localhost:5432/ceal_test"
+        run: pytest tests/integration/ -v --tb=short

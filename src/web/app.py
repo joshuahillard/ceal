@@ -42,7 +42,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Céal — Career Signal Engine",
         description="AI-powered job matching and resume tailoring pipeline",
-        version="2.1.0",
+        version="2.6.0",
         lifespan=lifespan,
     )
 
@@ -50,10 +50,11 @@ def create_app() -> FastAPI:
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
     # Register route modules
-    from src.web.routes import dashboard, demo, jobs
+    from src.web.routes import dashboard, demo, health, jobs
     app.include_router(dashboard.router)
     app.include_router(jobs.router)
     app.include_router(demo.router)
+    app.include_router(health.router)
 
     return app
 

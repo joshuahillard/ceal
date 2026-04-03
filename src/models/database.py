@@ -22,7 +22,6 @@ Architecture decisions (interview-defensible):
 
 from __future__ import annotations
 
-import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -37,6 +36,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import StaticPool
 
+from src.models.compat import get_database_url, is_sqlite
 from src.models.entities import (
     JobListingCreate,
     RankedResult,
@@ -50,23 +50,28 @@ logger = structlog.get_logger(__name__)
 # Engine Configuration
 # ---------------------------------------------------------------------------
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "sqlite+aiosqlite:///data/ceal.db",
-)
 
-# For in-memory SQLite (tests), we need StaticPool so all sessions
-# share the same connection — otherwise each connection gets its own
-# empty database. For file-based SQLite, standard pooling is fine.
-_engine_kwargs: dict = {"echo": False}
-if DATABASE_URL == "sqlite+aiosqlite://":
-    # In-memory: single shared connection
-    _engine_kwargs["poolclass"] = StaticPool
-    _engine_kwargs["connect_args"] = {"check_same_thread": False}
-else:
-    _engine_kwargs["pool_pre_ping"] = True
+def _create_engine():
+    """Create the async engine based on DATABASE_URL backend."""
+    url = get_database_url()
+    kwargs: dict = {"echo": False}
 
-engine = create_async_engine(DATABASE_URL, **_engine_kwargs)
+    if url == "sqlite+aiosqlite://":
+        # In-memory: single shared connection for test isolation
+        kwargs["poolclass"] = StaticPool
+        kwargs["connect_args"] = {"check_same_thread": False}
+    elif is_sqlite():
+        kwargs["pool_pre_ping"] = True
+    else:
+        # PostgreSQL — asyncpg connection pool
+        kwargs["pool_pre_ping"] = True
+        kwargs["pool_size"] = 5
+        kwargs["max_overflow"] = 10
+
+    return create_async_engine(url, **kwargs)
+
+
+engine = _create_engine()
 
 
 # ---------------------------------------------------------------------------
@@ -76,16 +81,17 @@ engine = create_async_engine(DATABASE_URL, **_engine_kwargs)
 # once and never again, new connections revert to the default journal mode.
 # This event listener guarantees every connection is configured correctly.
 
-@event.listens_for(engine.sync_engine, "connect")
-def _set_sqlite_pragmas(dbapi_conn, connection_record):
-    """Configure SQLite for concurrent async access."""
-    cursor = dbapi_conn.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL")       # concurrent reads + writes
-    cursor.execute("PRAGMA foreign_keys=ON")         # enforce referential integrity
-    cursor.execute("PRAGMA busy_timeout=5000")       # 5s retry on lock
-    cursor.execute("PRAGMA synchronous=NORMAL")      # safe with WAL, 2x faster
-    cursor.execute("PRAGMA cache_size=-64000")       # 64MB page cache
-    cursor.close()
+if is_sqlite():
+    @event.listens_for(engine.sync_engine, "connect")
+    def _set_sqlite_pragmas(dbapi_conn, connection_record):
+        """Configure SQLite for concurrent async access."""
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")       # concurrent reads + writes
+        cursor.execute("PRAGMA foreign_keys=ON")         # enforce referential integrity
+        cursor.execute("PRAGMA busy_timeout=5000")       # 5s retry on lock
+        cursor.execute("PRAGMA synchronous=NORMAL")      # safe with WAL, 2x faster
+        cursor.execute("PRAGMA cache_size=-64000")       # 64MB page cache
+        cursor.close()
 
 
 # ---------------------------------------------------------------------------
@@ -132,40 +138,43 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 async def init_db(schema_path: str | None = None) -> None:
     """
     Initialize the database from the SQL schema file.
-    Idempotent — safe to call on every startup because all CREATE statements
-    use IF NOT EXISTS.
-
-    Args:
-        schema_path: Path to schema.sql. Defaults to src/models/schema.sql.
+    Auto-selects schema.sql (SQLite) or schema_postgres.sql (PostgreSQL).
+    Idempotent — safe to call on every startup.
     """
     if schema_path is None:
-        schema_path = str(
-            Path(__file__).parent / "schema.sql"
-        )
+        if is_sqlite():
+            schema_path = str(Path(__file__).parent / "schema.sql")
+        else:
+            schema_path = str(Path(__file__).parent / "schema_postgres.sql")
 
     schema_sql = Path(schema_path).read_text()
-
-    # We need a smart SQL splitter because TRIGGER bodies contain
-    # semicolons inside BEGIN...END blocks. Naive split on ";" breaks them.
     statements = _split_sql_statements(schema_sql)
 
-    async with get_session() as session:
-        for stmt in statements:
-            if stmt:
-                await session.execute(text(stmt))
+    if is_sqlite():
+        async with get_session() as session:
+            for stmt in statements:
+                if stmt:
+                    await session.execute(text(stmt))
+    else:
+        # PostgreSQL: use engine.begin() for DDL outside session manager
+        async with engine.begin() as conn:
+            for stmt in statements:
+                if stmt:
+                    await conn.execute(text(stmt))
 
     logger.info("database_initialized", schema=schema_path)
 
 
 def _split_sql_statements(sql: str) -> list[str]:
     """
-    Split SQL into statements, correctly handling BEGIN...END blocks
-    in triggers. Standard semicolons split statements, but semicolons
-    inside CREATE TRIGGER ... BEGIN ... END are kept together.
+    Split SQL into statements, correctly handling:
+    - SQLite BEGIN...END trigger blocks
+    - PostgreSQL $$ dollar-quoted function bodies
     """
     statements: list[str] = []
     current: list[str] = []
     in_trigger = False
+    in_dollar_quote = False
 
     for line in sql.split("\n"):
         stripped = line.strip()
@@ -174,21 +183,29 @@ def _split_sql_statements(sql: str) -> list[str]:
         if stripped.startswith("--"):
             continue
 
-        # Remove inline comments
-        if "--" in stripped:
+        # Remove inline comments (but not inside dollar-quoted blocks)
+        if "--" in stripped and not in_dollar_quote:
             stripped = stripped[: stripped.index("--")].strip()
 
         if not stripped:
             continue
 
-        # Track whether we're inside a trigger block
+        # Track dollar-quoted blocks (PostgreSQL function bodies)
+        dollar_count = stripped.count("$$")
+        if dollar_count % 2 == 1:
+            in_dollar_quote = not in_dollar_quote
+
+        # Track SQLite trigger blocks
         if stripped.upper().startswith("CREATE TRIGGER"):
             in_trigger = True
 
         current.append(stripped)
 
+        if in_dollar_quote:
+            # Inside a dollar-quoted block — keep accumulating
+            continue
+
         if in_trigger:
-            # Trigger ends with "END;" on its own line
             if stripped.upper().rstrip(";") == "END":
                 in_trigger = False
                 full = " ".join(current).rstrip(";")
