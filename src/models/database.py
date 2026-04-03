@@ -154,9 +154,11 @@ async def init_db(schema_path: str | None = None) -> None:
 
     if is_sqlite():
         async with get_session() as session:
+            await _reconcile_sqlite_schema(session)
             for stmt in statements:
                 if stmt:
                     await session.execute(text(stmt))
+            await _ensure_resume_profile_exists(session, profile_id=1)
     else:
         # PostgreSQL: use engine.begin() for DDL outside session manager
         async with engine.begin() as conn:
@@ -165,6 +167,95 @@ async def init_db(schema_path: str | None = None) -> None:
                     await conn.execute(text(stmt))
 
     logger.info("database_initialized", schema=schema_path)
+
+
+_SQLITE_ADDITIVE_COLUMNS: dict[str, list[tuple[str, str]]] = {
+    "job_listings": [
+        ("recommended_tier", "INTEGER"),
+        ("regime_confidence", "REAL"),
+        ("regime_reasoning", "TEXT"),
+        ("regime_model_version", "TEXT"),
+        ("regime_classified_at", "TEXT"),
+    ],
+}
+
+
+async def _reconcile_sqlite_schema(session: AsyncSession) -> None:
+    """
+    Repair additive schema drift for existing SQLite files before applying
+    idempotent schema.sql statements.
+
+    SQLite won't backfill columns into an existing table via
+    CREATE TABLE IF NOT EXISTS, so indexes on newly introduced columns can
+    fail at startup against older local databases.
+    """
+    for table_name, columns in _SQLITE_ADDITIVE_COLUMNS.items():
+        if not await _sqlite_table_exists(session, table_name):
+            continue
+
+        existing_columns = await _sqlite_column_names(session, table_name)
+        for column_name, column_type in columns:
+            if column_name in existing_columns:
+                continue
+            await session.execute(
+                text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")  # noqa: S608
+            )
+            logger.info("sqlite_schema_column_added", table=table_name, column=column_name)
+
+
+async def _sqlite_table_exists(session: AsyncSession, table_name: str) -> bool:
+    result = await session.execute(
+        text("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = :table_name"),
+        {"table_name": table_name},
+    )
+    return result.first() is not None
+
+
+async def _sqlite_column_names(session: AsyncSession, table_name: str) -> set[str]:
+    result = await session.execute(text(f"PRAGMA table_info({table_name})"))  # noqa: S608
+    return {row[1] for row in result}
+
+
+def _default_resume_profile_payload() -> dict:
+    """Load the default resume profile payload used for local startup and prefill."""
+    resume_path = Path("data") / "resume.txt"
+    raw_text = resume_path.read_text() if resume_path.exists() else ""
+
+    first_line = next((line.strip() for line in raw_text.splitlines() if line.strip()), "")
+    name = first_line or "Joshua Hillard"
+
+    return {
+        "profile_id": 1,
+        "name": name,
+        "version": "default",
+        "raw_text": raw_text or None,
+    }
+
+
+async def _ensure_resume_profile_exists(session: AsyncSession, profile_id: int) -> None:
+    """Ensure the requested resume profile exists, creating the default profile when appropriate."""
+    result = await session.execute(
+        text("SELECT id FROM resume_profiles WHERE id = :profile_id"),
+        {"profile_id": profile_id},
+    )
+    if result.first() is not None:
+        return
+
+    if profile_id != 1:
+        raise ValueError(
+            f"Resume profile {profile_id} not found. Create the profile before generating an application draft."
+        )
+
+    payload = _default_resume_profile_payload()
+    await session.execute(
+        text("""
+            INSERT INTO resume_profiles (id, name, version, raw_text)
+            VALUES (:profile_id, :name, :version, :raw_text)
+            ON CONFLICT(id) DO NOTHING
+        """),
+        payload,
+    )
+    logger.info("default_resume_profile_created", profile_id=profile_id)
 
 
 def _split_sql_statements(sql: str) -> list[str]:
@@ -245,7 +336,7 @@ async def upsert_job(job: JobListingCreate) -> int:
     check-and-act in a single statement."
     """
     async with get_session() as session:
-        result = await session.execute(
+        await session.execute(
             text("""
                 INSERT INTO job_listings (
                     external_id, source, title, company_name, url,
@@ -284,7 +375,18 @@ async def upsert_job(job: JobListingCreate) -> int:
                 "expiry_date": job.expiry_date,
             },
         )
-        row_id = result.lastrowid or 0
+        row_id_result = await session.execute(
+            text("""
+                SELECT id
+                FROM job_listings
+                WHERE external_id = :external_id AND source = :source
+            """),
+            {
+                "external_id": job.external_id,
+                "source": job.source.value,
+            },
+        )
+        row_id = row_id_result.scalar_one()
 
     logger.info(
         "job_upserted",
@@ -493,6 +595,79 @@ async def get_top_matches(
                   {tier_clause}
                 ORDER BY match_score DESC, company_tier ASC
                 LIMIT :limit
+            """),
+            params,
+        )
+        return [dict(row._mapping) for row in result]
+
+
+async def get_job_board_listings(
+    min_score: float = 0.0,
+    tier: int | None = None,
+    limit: int = 25,
+    include_unranked: bool = True,
+) -> list[dict]:
+    """
+    Jobs-page query with optional inclusion of freshly scraped but unranked jobs.
+
+    This is intentionally more permissive than get_top_matches so the web UI can
+    stay useful even when live ranking is unavailable or in progress.
+    """
+    params: dict[str, object] = {
+        "min_score": min_score,
+        "limit": limit,
+        "include_unranked": 1 if include_unranked else 0,
+    }
+
+    tier_clause = ""
+    if tier is not None:
+        tier_clause = "AND company_tier = :tier"
+        params["tier"] = tier
+
+    async with get_session() as session:
+        result = await session.execute(
+            text(f"""
+                SELECT id, title, company_name, company_tier,
+                       match_score, match_reasoning, url, location,
+                       remote_type, salary_min, salary_max, status,
+                       recommended_tier
+                FROM job_listings
+                WHERE status IN ('ranked', 'scraped')
+                  AND (
+                    match_score >= :min_score
+                    OR (:include_unranked = 1 AND match_score IS NULL)
+                  )
+                  {tier_clause}
+                ORDER BY
+                    CASE WHEN match_score IS NULL THEN 1 ELSE 0 END,
+                    match_score DESC,
+                    CASE WHEN company_tier IS NULL THEN 1 ELSE 0 END,
+                    company_tier ASC,
+                    scraped_at DESC
+                LIMIT :limit
+            """),
+            params,
+        )
+        return [dict(row._mapping) for row in result]
+
+
+async def get_jobs_by_ids(job_ids: list[int]) -> list[dict]:
+    """Fetch a specific batch of jobs for the live Jobs page refresh."""
+    if not job_ids:
+        return []
+
+    placeholders = ", ".join(f":job_id_{index}" for index, _ in enumerate(job_ids))
+    params = {f"job_id_{index}": job_id for index, job_id in enumerate(job_ids)}
+
+    async with get_session() as session:
+        result = await session.execute(
+            text(f"""
+                SELECT id, title, company_name, company_tier,
+                       match_score, match_reasoning, url, location,
+                       remote_type, salary_min, salary_max, status,
+                       recommended_tier
+                FROM job_listings
+                WHERE id IN ({placeholders})
             """),
             params,
         )
@@ -802,6 +977,8 @@ async def create_application(app: ApplicationCreate) -> int:
     Applications are idempotent per (job_id, profile_id).
     """
     async with get_session() as session:
+        await _ensure_resume_profile_exists(session, app.profile_id)
+
         await session.execute(
             text("""
                 INSERT INTO applications (job_id, profile_id, cover_letter, confidence_score, notes)

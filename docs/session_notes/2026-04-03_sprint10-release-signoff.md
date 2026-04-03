@@ -94,6 +94,32 @@ The release also strengthens the interview narrative. ReportLab answers the “w
 
 **Verdict:** SHIP IT. ✅
 
+## Post-Release Addendum — Jobs Tab Hardening
+After Sprint 10 was live, the Jobs tab surfaced two runtime issues that required immediate stabilization work:
+- Empty `tier` query values from the filter form could raise FastAPI validation errors (`int_parsing`) instead of rendering the page.
+- A rejected Anthropic key could trigger one `401 Unauthorized` warning per job during live ranking, creating noisy logs and making the Jobs page look less reliable than it was.
+
+The Jobs route was hardened to address those failure modes directly:
+- `src/web/routes/jobs.py` now parses filters manually from `request.query_params`, so blank values like `/jobs?tier=` resolve safely to `None` instead of throwing a `422`.
+- The Jobs page now performs a live LinkedIn refresh on each load, using the current search query and location from the UI, then falls back to cached database listings if the live refresh fails.
+- `src/models/database.py` now returns the correct row ID after job upserts by selecting the row after the `ON CONFLICT` write, which keeps the refreshed batch stable when the UI reloads.
+- The Jobs route now serves both `/jobs` and `/jobs/` directly, and the navigation plus filter form point to the canonical Jobs endpoint without an extra redirect hop.
+- Anthropic authorization failures now fail open cleanly. If the configured LLM key is rejected with `401` or `403`, the route stops ranking immediately, logs one route-level warning, shows fresh jobs with pending scores, and skips repeated ranking attempts for that same rejected key during the current process lifetime.
+
+### Jobs Tab Validation
+- `pytest tests/ -q` completed at `295/295` passing.
+- `ruff check src/ tests/` remained clean.
+- Live HTTP smoke tests returned `200` for:
+  - `/jobs`
+  - `/jobs?tier=`
+  - `/jobs?query=Technical%20Program%20Manager&location=New%20York,%20NY&limit=10`
+- On a fresh local server started at **10:14 AM EDT on April 3, 2026**, live ranking also succeeded for `/jobs?limit=1`, which means the earlier `401 Unauthorized` issue did not reproduce under the refreshed process and current runtime configuration.
+
+### Stakeholder Implication
+- **QA Lead:** the longest-running UI reliability hotspot now has explicit regression coverage for empty filter values, direct route access, and rejected Anthropic credentials.
+- **AI Architect:** LLM-assisted ranking remains an enhancer, not a blocker; fresh jobs still load even when the LLM credential is invalid.
+- **DPM:** the Jobs tab now better matches product intent by refreshing current role searches on load instead of behaving like a brittle cached report.
+
 ## What's NOT in This Session
 - No new application code beyond the already-pushed Sprint 10 release
 - No changes to the `.docx` export path

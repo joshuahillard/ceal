@@ -4,7 +4,38 @@
 {% block content %}
 <h1>Job Listings</h1>
 
-<form class="filter-bar" method="get" action="/jobs">
+<p class="muted">
+    The Jobs tab runs a live search every time it loads so this page reflects the current role search, not just cached results.
+</p>
+
+{% if refresh.error %}
+<div class="alert alert-warning">
+    Live refresh from {{ refresh.source_label }} failed for "{{ filters.query }}" in "{{ filters.location }}".
+    Showing cached results instead.
+</div>
+{% elif refresh.warning %}
+<div class="alert alert-warning">
+    {{ refresh.warning }}
+</div>
+{% endif %}
+
+<div class="summary-bar">
+    <span class="summary-item"><strong>Search</strong> {{ filters.query }}</span>
+    <span class="summary-item"><strong>Location</strong> {{ filters.location }}</span>
+    <span class="summary-item"><strong>Source</strong> {{ refresh.source_label }}</span>
+    <span class="summary-item"><strong>Live Refresh</strong> {{ refresh.refreshed_count }} jobs</span>
+    <span class="summary-item"><strong>Ranked</strong> {{ refresh.ranked_count }}</span>
+</div>
+
+<form class="filter-bar" method="get" action="/jobs/">
+    <label>
+        Query
+        <input type="text" name="query" value="{{ filters.query }}">
+    </label>
+    <label>
+        Location
+        <input type="text" name="location" value="{{ filters.location }}">
+    </label>
     <label>
         Min Score
         <input type="range" name="min_score" min="0" max="1" step="0.05"
@@ -25,7 +56,7 @@
         Limit
         <input type="number" name="limit" min="1" max="200" value="{{ filters.limit }}">
     </label>
-    <button type="submit" class="btn">Filter</button>
+    <button type="submit" class="btn">Refresh Results</button>
 </form>
 
 {% if jobs %}
@@ -47,10 +78,14 @@
         {% for job in jobs %}
         <tr>
             <td>
-                {% set score_pct = (job.match_score * 100) | round | int if job.match_score else 0 %}
-                <span class="badge {% if score_pct >= 70 %}badge-green{% elif score_pct >= 50 %}badge-yellow{% else %}badge-red{% endif %}">
-                    {{ score_pct }}%
-                </span>
+                {% if job.match_score is not none %}
+                    {% set score_pct = (job.match_score * 100) | round | int %}
+                    <span class="badge {% if score_pct >= 70 %}badge-green{% elif score_pct >= 50 %}badge-yellow{% else %}badge-red{% endif %}">
+                        {{ score_pct }}%
+                    </span>
+                {% else %}
+                    <span class="badge">Pending</span>
+                {% endif %}
             </td>
             <td>{{ job.title }}</td>
             <td>

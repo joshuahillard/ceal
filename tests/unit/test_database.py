@@ -25,6 +25,7 @@ from src.models.database import (
     assign_company_tiers,
     create_resume_profile,
     engine,
+    get_job_board_listings,
     get_pipeline_stats,
     get_top_matches,
     get_unranked_jobs,
@@ -131,6 +132,121 @@ class TestSchemaInit:
             count = result.scalar()
             assert count >= 30, f"Expected at least 30 seeded skills, got {count}"
 
+    @pytest.mark.asyncio
+    async def test_default_resume_profile_seeded(self):
+        """Startup init should seed the default resume profile for auto-apply flows."""
+        from sqlalchemy import text
+
+        from src.models.database import get_session
+
+        async with get_session() as session:
+            result = await session.execute(
+                text("SELECT id, name, raw_text FROM resume_profiles WHERE id = 1")
+            )
+            row = result.first()
+
+        assert row is not None
+        assert row[0] == 1
+        assert row[1]
+        assert row[2] is not None
+
+    @pytest.mark.asyncio
+    async def test_init_db_reconciles_legacy_sqlite_schema(self, tmp_path):
+        """Existing SQLite files should be repaired before new indexes are applied."""
+        import os
+        from contextlib import asynccontextmanager
+        from unittest.mock import patch
+
+        from sqlalchemy import text
+        from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+        db_path = tmp_path / "legacy_ceal.db"
+        original_url = os.environ["DATABASE_URL"]
+        os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{db_path.as_posix()}"
+
+        test_engine = create_async_engine(os.environ["DATABASE_URL"], echo=False)
+        test_session = async_sessionmaker(bind=test_engine, class_=AsyncSession, expire_on_commit=False)
+
+        @asynccontextmanager
+        async def mock_session():
+            session = test_session()
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+            finally:
+                await session.close()
+
+        try:
+            async with test_engine.begin() as conn:
+                await conn.execute(text("""
+                    CREATE TABLE job_listings (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        external_id TEXT NOT NULL,
+                        source TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        company_name TEXT NOT NULL,
+                        company_tier INTEGER,
+                        location TEXT,
+                        remote_type TEXT,
+                        salary_min REAL,
+                        salary_max REAL,
+                        salary_currency TEXT DEFAULT 'USD',
+                        url TEXT NOT NULL,
+                        description_raw TEXT,
+                        description_clean TEXT,
+                        posting_date TEXT,
+                        expiry_date TEXT,
+                        match_score REAL,
+                        match_reasoning TEXT,
+                        rank_model_version TEXT,
+                        status TEXT NOT NULL DEFAULT 'scraped',
+                        scraped_at TEXT,
+                        ranked_at TEXT,
+                        created_at TEXT,
+                        updated_at TEXT,
+                        UNIQUE(external_id, source)
+                    )
+                """))
+                await conn.execute(text("""
+                    CREATE TABLE resume_profiles (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL,
+                        version TEXT NOT NULL DEFAULT '1.0',
+                        raw_text TEXT,
+                        created_at TEXT
+                    )
+                """))
+
+            with patch("src.models.database.get_session", mock_session), patch("src.models.database.engine", test_engine):
+                await init_db()
+
+                async with mock_session() as session:
+                    result = await session.execute(text("PRAGMA table_info(job_listings)"))
+                    columns = {row[1] for row in result}
+
+                    applications_result = await session.execute(
+                        text("SELECT name FROM sqlite_master WHERE type='table' AND name='applications'")
+                    )
+                    seeded_profile_result = await session.execute(
+                        text("SELECT id FROM resume_profiles WHERE id = 1")
+                    )
+                    applications_exists = applications_result.first() is not None
+                    seeded_profile_exists = seeded_profile_result.first() is not None
+
+            assert "recommended_tier" in columns
+            assert "regime_confidence" in columns
+            assert "regime_reasoning" in columns
+            assert "regime_model_version" in columns
+            assert "regime_classified_at" in columns
+            assert applications_exists
+            assert seeded_profile_exists
+        finally:
+            os.environ["DATABASE_URL"] = original_url
+            await test_engine.dispose()
+
 
 # ---------------------------------------------------------------------------
 # Upsert Tests
@@ -150,12 +266,13 @@ class TestUpsertJob:
         job_v1 = _make_job(title="Solutions Engineer")
         job_v2 = _make_job(title="Senior Solutions Engineer")
 
-        await upsert_job(job_v1)
-        await upsert_job(job_v2)
+        row_id_1 = await upsert_job(job_v1)
+        row_id_2 = await upsert_job(job_v2)
 
         jobs = await get_unranked_jobs()
         assert len(jobs) == 1, "Should be exactly 1 job (upsert, not insert)"
         assert jobs[0]["title"] == "Senior Solutions Engineer"
+        assert row_id_1 == row_id_2
 
     @pytest.mark.asyncio
     async def test_different_sources_are_separate(self):
@@ -297,6 +414,24 @@ class TestRanking:
         matches = await get_top_matches(min_score=0.5)
         assert len(matches) == 2
         assert matches[0]["match_score"] == 0.9  # highest first
+
+    @pytest.mark.asyncio
+    async def test_get_job_board_listings_includes_unranked_when_requested(self):
+        """Jobs page fallback query should keep scraped rows visible when scoring is unavailable."""
+        await upsert_job(_make_job(external_id="board_1", company="Stripe"))
+        ranked_id = await upsert_job(_make_job(external_id="board_2", company="Datadog"))
+        await update_job_ranking(RankedResult(
+            job_id=ranked_id,
+            match_score=0.8,
+            match_reasoning="Good fit for test coverage.",
+            rank_model_version="test",
+        ))
+
+        jobs = await get_job_board_listings(min_score=0.5, include_unranked=True)
+
+        assert len(jobs) == 2
+        assert jobs[0]["match_score"] == 0.8
+        assert jobs[1]["match_score"] is None
 
 
 # ---------------------------------------------------------------------------

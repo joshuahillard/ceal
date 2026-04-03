@@ -10,8 +10,10 @@ rendering, and form processing without database setup overhead."
 """
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -140,17 +142,52 @@ class TestJobs:
                 "status": "ranked",
             },
         ]
-        with patch("src.web.routes.jobs.get_top_matches", new_callable=AsyncMock, return_value=mock_jobs):
+        refresh_meta = {
+            "attempted": True,
+            "success": True,
+            "fallback": False,
+            "source_label": "LinkedIn",
+            "query": "Technical Solutions Engineer",
+            "location": "Boston, MA",
+            "llm_enabled": True,
+            "refreshed_count": 1,
+            "ranked_count": 1,
+            "warning": None,
+            "error": None,
+        }
+        with patch(
+            "src.web.routes.jobs._load_jobs_page",
+            new_callable=AsyncMock,
+            return_value=(mock_jobs, refresh_meta),
+        ):
             response = await client.get("/jobs")
         assert response.status_code == 200
         assert "Stripe" in response.text
         assert "85%" in response.text
         assert "Pre-Fill" in response.text
+        assert "Live Refresh" in response.text
 
     @pytest.mark.asyncio
     async def test_jobs_empty(self, client):
         """GET /jobs with no matches shows empty state."""
-        with patch("src.web.routes.jobs.get_top_matches", new_callable=AsyncMock, return_value=[]):
+        refresh_meta = {
+            "attempted": True,
+            "success": True,
+            "fallback": False,
+            "source_label": "LinkedIn",
+            "query": "Technical Solutions Engineer",
+            "location": "Boston, MA",
+            "llm_enabled": True,
+            "refreshed_count": 0,
+            "ranked_count": 0,
+            "warning": None,
+            "error": None,
+        }
+        with patch(
+            "src.web.routes.jobs._load_jobs_page",
+            new_callable=AsyncMock,
+            return_value=([], refresh_meta),
+        ):
             response = await client.get("/jobs")
         assert response.status_code == 200
         assert "No jobs match" in response.text
@@ -158,10 +195,187 @@ class TestJobs:
     @pytest.mark.asyncio
     async def test_jobs_filter_params(self, client):
         """GET /jobs passes filter parameters correctly."""
-        with patch("src.web.routes.jobs.get_top_matches", new_callable=AsyncMock, return_value=[]) as mock:
+        refresh_meta = {
+            "attempted": True,
+            "success": True,
+            "fallback": False,
+            "source_label": "LinkedIn",
+            "query": "Platform Engineer",
+            "location": "Remote",
+            "llm_enabled": True,
+            "refreshed_count": 0,
+            "ranked_count": 0,
+            "warning": None,
+            "error": None,
+        }
+        with patch(
+            "src.web.routes.jobs._load_jobs_page",
+            new_callable=AsyncMock,
+            return_value=([], refresh_meta),
+        ) as mock:
             response = await client.get("/jobs?min_score=0.7&tier=1&limit=10")
         assert response.status_code == 200
-        mock.assert_called_once_with(min_score=0.7, tier=1, limit=10)
+        mock.assert_called_once_with(
+            query="Technical Solutions Engineer",
+            location="Boston, MA",
+            min_score=0.7,
+            tier=1,
+            limit=10,
+        )
+
+    @pytest.mark.asyncio
+    async def test_jobs_empty_tier_query_does_not_422(self, client):
+        """Empty tier query params from the filter form should fall back to All."""
+        refresh_meta = {
+            "attempted": True,
+            "success": True,
+            "fallback": False,
+            "source_label": "LinkedIn",
+            "query": "Technical Solutions Engineer",
+            "location": "Boston, MA",
+            "llm_enabled": True,
+            "refreshed_count": 0,
+            "ranked_count": 0,
+            "warning": None,
+            "error": None,
+        }
+        with patch(
+            "src.web.routes.jobs._load_jobs_page",
+            new_callable=AsyncMock,
+            return_value=([], refresh_meta),
+        ) as mock:
+            response = await client.get("/jobs?tier=")
+
+        assert response.status_code == 200
+        mock.assert_called_once_with(
+            query="Technical Solutions Engineer",
+            location="Boston, MA",
+            min_score=0.3,
+            tier=None,
+            limit=25,
+        )
+
+    @pytest.mark.asyncio
+    async def test_jobs_route_accepts_no_trailing_slash_without_redirect(self, app):
+        """The nav link should load /jobs directly without an extra redirect hop."""
+        refresh_meta = {
+            "attempted": True,
+            "success": True,
+            "fallback": False,
+            "source_label": "LinkedIn",
+            "query": "Technical Solutions Engineer",
+            "location": "Boston, MA",
+            "llm_enabled": True,
+            "refreshed_count": 0,
+            "ranked_count": 0,
+            "warning": None,
+            "error": None,
+        }
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test", follow_redirects=False) as raw_client:
+            with patch(
+                "src.web.routes.jobs._load_jobs_page",
+                new_callable=AsyncMock,
+                return_value=([], refresh_meta),
+            ) as mock:
+                response = await raw_client.get("/jobs")
+
+        assert response.status_code == 200
+        mock.assert_called_once_with(
+            query="Technical Solutions Engineer",
+            location="Boston, MA",
+            min_score=0.3,
+            tier=None,
+            limit=25,
+        )
+
+    @pytest.mark.asyncio
+    async def test_jobs_refresh_disables_rejected_llm_key_after_first_401(self):
+        """A rejected Anthropic key should produce one graceful failure, then skip future ranking."""
+        from src.models.entities import JobListingCreate, JobSource, RemoteType
+        from src.web.routes import jobs as jobs_route
+
+        raw_job = SimpleNamespace(external_id="job-1")
+        clean_job = JobListingCreate(
+            external_id="job-1",
+            source=JobSource.LINKEDIN,
+            title="Technical Solutions Engineer",
+            company_name="Stripe",
+            url="https://stripe.com/jobs/1",
+            location="Boston, MA",
+            remote_type=RemoteType.HYBRID,
+            description_raw="Solve customer issues with Python and APIs.",
+            description_clean="Solve customer issues with Python and APIs.",
+        )
+        request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+        response = httpx.Response(401, request=request)
+        auth_error = httpx.HTTPStatusError("Unauthorized", request=request, response=response)
+
+        with (
+            patch.dict("os.environ", {"LLM_API_KEY": "bad-key"}, clear=True),
+            patch.object(jobs_route, "_INVALID_LLM_API_KEY", None),
+            patch("src.web.routes.jobs.LinkedInScraper") as mock_scraper_cls,
+            patch("src.web.routes.jobs.normalize_job", return_value=(clean_job, [])),
+            patch("src.web.routes.jobs.upsert_job", new_callable=AsyncMock, return_value=11),
+            patch("src.web.routes.jobs.assign_company_tiers", new_callable=AsyncMock, return_value=0),
+            patch("src.web.routes.jobs.get_jobs_by_ids", new_callable=AsyncMock, return_value=[{"id": 11}]),
+            patch("src.web.routes.jobs._load_resume_text", return_value="Resume text"),
+            patch("src.web.routes.jobs.LLMRanker") as mock_ranker_cls,
+        ):
+            mock_scraper = AsyncMock()
+            mock_scraper.scrape_jobs.return_value = [raw_job]
+            mock_scraper_cls.return_value.__aenter__ = AsyncMock(return_value=mock_scraper)
+            mock_scraper_cls.return_value.__aexit__ = AsyncMock(return_value=None)
+
+            mock_ranker = AsyncMock()
+            mock_ranker.rank_job.side_effect = auth_error
+            mock_ranker_cls.return_value.__aenter__ = AsyncMock(return_value=mock_ranker)
+            mock_ranker_cls.return_value.__aexit__ = AsyncMock(return_value=None)
+
+            first = await jobs_route._refresh_live_jobs("Technical Solutions Engineer", "Boston, MA", 1)
+            second = await jobs_route._refresh_live_jobs("Technical Solutions Engineer", "Boston, MA", 1)
+
+        assert first["success"] is True
+        assert first["ranked_count"] == 0
+        assert "rejected by Anthropic" in first["warning"]
+        assert second["success"] is True
+        assert second["ranked_count"] == 0
+        assert "rejected by Anthropic" in second["warning"]
+        assert mock_ranker.rank_job.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_jobs_query_and_location_are_preserved(self, client):
+        """Jobs page should drive live refresh from the current search inputs."""
+        refresh_meta = {
+            "attempted": True,
+            "success": True,
+            "fallback": False,
+            "source_label": "LinkedIn",
+            "query": "TPM",
+            "location": "New York, NY",
+            "llm_enabled": True,
+            "refreshed_count": 0,
+            "ranked_count": 0,
+            "warning": None,
+            "error": None,
+        }
+        with patch(
+            "src.web.routes.jobs._load_jobs_page",
+            new_callable=AsyncMock,
+            return_value=([], refresh_meta),
+        ) as mock:
+            response = await client.get("/jobs?query=TPM&location=New%20York,%20NY&min_score=0.5")
+
+        assert response.status_code == 200
+        mock.assert_called_once_with(
+            query="TPM",
+            location="New York, NY",
+            min_score=0.5,
+            tier=None,
+            limit=25,
+        )
+        assert 'value="TPM"' in response.text
+        assert 'value="New York, NY"' in response.text
 
 
 # ---------------------------------------------------------------------------

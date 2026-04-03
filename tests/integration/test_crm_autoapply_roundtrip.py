@@ -171,6 +171,25 @@ class TestCrmAutoApplyRoundTrip:
         assert {field["field_name"] for field in application["fields"]} == {"full_name", "resume_text"}
 
     @pytest.mark.asyncio
+    async def test_create_application_recovers_default_profile_if_missing(self):
+        """create_application should recreate the default profile when startup state is incomplete."""
+        job_id = await _create_ranked_job("apply-default-profile")
+
+        async with get_session() as session:
+            await session.execute(text("DELETE FROM resume_profiles WHERE id = 1"))
+
+        app_id = await create_application(ApplicationCreate(job_id=job_id, profile_id=1))
+        application = await get_application(app_id)
+
+        async with get_session() as session:
+            result = await session.execute(text("SELECT id FROM resume_profiles WHERE id = 1"))
+            profile_row = result.first()
+
+        assert app_id > 0
+        assert application is not None
+        assert profile_row is not None
+
+    @pytest.mark.asyncio
     async def test_approving_application_syncs_parent_job_to_applied(self):
         """Approving an application should move the linked job into applied."""
         job_id = await _create_ranked_job("apply-002")
