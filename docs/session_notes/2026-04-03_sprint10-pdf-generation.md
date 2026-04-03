@@ -1,7 +1,9 @@
-# Ceal Session Notes — Thursday April 3, 2026
+# Ceal Session Notes — Friday April 3, 2026
 
 **Session type:** Sprint 10 — PDF Document Generation Pipeline
 **AI platform:** Claude Code (Opus 4.6)
+**Commit(s):** `655adf7`
+**Tag:** `v2.10.0-sprint10-pdf-generation`
 **Branch:** main
 
 ## Objective
@@ -65,6 +67,7 @@ Integrate production PDF generation for resumes and cover letters into the Ceal 
 | Failed | 0 |
 | New tests added | 41 |
 | Lint errors | 0 |
+| GitHub Actions | Green after push |
 
 ## Architecture Decisions
 - **ReportLab canvas API** over HTML-to-PDF: pixel-level control over design system, no browser dependency
