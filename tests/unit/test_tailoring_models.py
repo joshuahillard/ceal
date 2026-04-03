@@ -32,7 +32,6 @@ from src.tailoring.models import (
     TailoringResult,
 )
 
-
 # ---------------------------------------------------------------------------
 # ParsedBullet Tests
 # ---------------------------------------------------------------------------
@@ -433,14 +432,15 @@ class TestTailoringResult:
     def test_empty_bullets_allowed(self):
         """
         An empty tailored_bullets list is valid — the LLM might determine
-        no bullets are relevant for a particular job listing.
+        no bullets are worth tailoring for a low-match listing.
         """
         result = TailoringResult(
             request=TailoringRequest(
-                job_id=99, profile_id=1, target_tier=3,
+                job_id=1, profile_id=1, target_tier=3,
             ),
             tailored_bullets=[],
             skill_gaps=[],
             tailoring_version="v1.0",
         )
         assert result.tailored_bullets == []
+        assert result.skill_gaps == []

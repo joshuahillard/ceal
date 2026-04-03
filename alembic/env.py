@@ -13,12 +13,11 @@ This is transparent to us but essential for migration correctness.
 import asyncio
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from alembic import context
-
-from src.tailoring.db_models import Base, PHASE1_STUB_TABLES
+from src.tailoring.db_models import PHASE1_STUB_TABLES, Base
 
 # Alembic Config object — provides access to .ini file values
 config = context.config
@@ -38,9 +37,7 @@ def include_object(object, name, type_, reflected, compare_to):
     Phase 1 tables (job_listings, resume_profiles) are defined as ORM stubs
     solely for FK resolution. Their DDL is managed by schema.sql, not Alembic.
     """
-    if type_ == "table" and name in PHASE1_STUB_TABLES:
-        return False
-    return True
+    return not (type_ == "table" and name in PHASE1_STUB_TABLES)
 
 
 def run_migrations_offline() -> None:

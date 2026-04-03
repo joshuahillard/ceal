@@ -70,6 +70,10 @@ from src.models.entities import (
 from src.normalizer.pipeline import normalize_job
 from src.ranker.llm_ranker import LLMRanker
 from src.scrapers.linkedin import LinkedInScraper
+from src.tailoring.engine import TailoringEngine
+from src.tailoring.models import TailoringRequest
+from src.tailoring.resume_parser import ResumeProfileParser
+from src.tailoring.skill_extractor import SkillOverlapAnalyzer
 
 logger = structlog.get_logger(__name__)
 
@@ -242,6 +246,7 @@ async def ranker_stage(
     clean_queue: asyncio.Queue,
     resume_text: str,
     api_key: str | None = None,
+    output_queue: asyncio.Queue | None = None,
 ) -> None:
     """
     Stage 3: CONSUMER — scores jobs against the resume via LLM.
@@ -273,6 +278,8 @@ async def ranker_stage(
             "ranker_skipped",
             reason="No LLM_API_KEY configured. Set LLM_API_KEY in .env to enable ranking.",
         )
+        if output_queue is not None:
+            await output_queue.put(_SHUTDOWN)
         return
 
     logger.info("ranker_scoring_jobs", queued_count=count)
@@ -283,6 +290,8 @@ async def ranker_stage(
     unranked = await get_unranked_jobs(limit=50)
     if not unranked:
         logger.info("no_unranked_jobs")
+        if output_queue is not None:
+            await output_queue.put(_SHUTDOWN)
         return
 
     ranked = 0
@@ -306,6 +315,10 @@ async def ranker_stage(
                 await update_job_ranking(result)
                 ranked += 1
 
+                # Push ranked job to tailor stage if output queue is connected
+                if output_queue is not None:
+                    await output_queue.put(job)
+
             except Exception as exc:
                 errors += 1
                 logger.error(
@@ -314,10 +327,122 @@ async def ranker_stage(
                     error=str(exc),
                 )
 
+    # Signal shutdown to tailor stage
+    if output_queue is not None:
+        await output_queue.put(_SHUTDOWN)
+
     logger.info(
         "ranker_stage_complete",
         total=len(unranked),
         ranked=ranked,
+        errors=errors,
+    )
+
+
+async def tailor_stage(
+    rank_queue: asyncio.Queue,
+    resume_text: str,
+    api_key: str | None = None,
+    concurrency: int = 3,
+) -> None:
+    """
+    Stage 4: TAILOR -- generates role-specific resume bullets via Claude API.
+
+    Consumes ranked job IDs from rank_queue, parses the resume, runs
+    skill gap analysis, and calls the TailoringEngine to generate
+    X-Y-Z format bullets with relevance scoring.
+
+    Rate-limited via asyncio.Semaphore to avoid Claude API throttling.
+    Graceful degradation: LLM failures are logged and skipped, never blocking.
+
+    Interview point: "The tailor stage uses a semaphore to rate-limit
+    Claude API calls. If an LLM call fails, we log the error and skip
+    that job -- the pipeline never blocks on a single failure. This is
+    the same graceful degradation pattern used in production microservices."
+    """
+    logger.info("tailor_stage_started", concurrency=concurrency)
+
+    if not api_key:
+        logger.warning(
+            "tailor_skipped",
+            reason="No LLM_API_KEY configured. Tailoring requires an API key.",
+        )
+        # Drain the queue
+        while True:
+            item = await rank_queue.get()
+            rank_queue.task_done()
+            if item is _SHUTDOWN:
+                break
+        return
+
+    # Rate-limit semaphore
+    semaphore = asyncio.Semaphore(concurrency)
+    engine = TailoringEngine(api_key=api_key)
+    parser = ResumeProfileParser()
+    analyzer = SkillOverlapAnalyzer()
+
+    # Parse resume once (shared across all jobs)
+    parsed_resume = parser.parse(profile_id=1, raw_text=resume_text)
+    resume_bullets = [b.original_text for b in parsed_resume.sections]
+    resume_skills = list({
+        skill for b in parsed_resume.sections for skill in b.skills_referenced
+    })
+
+    tailored = 0
+    errors = 0
+
+    while True:
+        item = await rank_queue.get()
+
+        if item is _SHUTDOWN:
+            rank_queue.task_done()
+            break
+
+        job = item
+
+        async def _tailor_job(job_data):
+            nonlocal tailored, errors
+            async with semaphore:
+                try:
+                    # Build skill gaps for this specific job
+                    skill_gaps = analyzer.analyze(
+                        job=job_data, resume_skills=resume_skills,
+                    )
+
+                    request = TailoringRequest(
+                        job_id=job_data.id if hasattr(job_data, "id") else 0,
+                        profile_id=1,
+                        target_tier=getattr(job_data, "company_tier", None) or 1,
+                        emphasis_areas=[g.skill_name for g in skill_gaps if g.resume_has],
+                    )
+
+                    result = await engine.generate_tailored_profile(
+                        request=request,
+                        resume_bullets=resume_bullets,
+                        skill_gaps=skill_gaps,
+                    )
+                    tailored += 1
+
+                    logger.info(
+                        "job_tailored",
+                        job_id=request.job_id,
+                        bullets=len(result.tailored_bullets),
+                        version=result.tailoring_version,
+                    )
+
+                except Exception as exc:
+                    errors += 1
+                    logger.error(
+                        "tailor_job_failed",
+                        error=str(exc),
+                    )
+
+        await _tailor_job(job)
+        rank_queue.task_done()
+
+    logger.info(
+        "tailor_stage_complete",
+        tailored=tailored,
         errors=errors,
     )
 
@@ -333,6 +458,7 @@ async def run_pipeline(
     resume_text: str | None = None,
     rank: bool = True,
     api_key: str | None = None,
+    **kwargs,
 ) -> dict:
     """
     Run the full three-stage pipeline.
@@ -354,6 +480,7 @@ async def run_pipeline(
     # Create bounded queues (backpressure)
     raw_queue: asyncio.Queue = asyncio.Queue(maxsize=100)
     clean_queue: asyncio.Queue = asyncio.Queue(maxsize=100)
+    rank_queue: asyncio.Queue = asyncio.Queue(maxsize=100)
 
     # Default resume text if none provided
     if resume_text is None:
@@ -363,17 +490,20 @@ async def run_pipeline(
     if api_key is None:
         api_key = os.getenv("LLM_API_KEY")
 
+    tailor = kwargs.get("tailor", False)
+
     logger.info(
         "pipeline_started",
         query=query,
         location=location,
         max_results=max_results,
         ranking_enabled=rank and bool(api_key),
+        tailoring_enabled=tailor and bool(api_key),
     )
 
     start = time.monotonic()
 
-    # Launch all three stages as concurrent tasks
+    # Launch all stages as concurrent tasks
     scraper_task = asyncio.create_task(
         scraper_stage(raw_queue, query, location, max_results),
         name="scraper",
@@ -383,12 +513,30 @@ async def run_pipeline(
         name="normalizer",
     )
     ranker_task = asyncio.create_task(
-        ranker_stage(clean_queue, resume_text, api_key if rank else None),
+        ranker_stage(clean_queue, resume_text, api_key if rank else None, output_queue=rank_queue),
         name="ranker",
     )
 
+    tasks = [scraper_task, normalizer_task, ranker_task]
+
+    if tailor and api_key:
+        tailor_task = asyncio.create_task(
+            tailor_stage(rank_queue, resume_text, api_key),
+            name="tailor",
+        )
+        tasks.append(tailor_task)
+    else:
+        # Drain rank_queue if tailoring is disabled
+        async def _drain_rank_queue():
+            while True:
+                item = await rank_queue.get()
+                rank_queue.task_done()
+                if item is _SHUTDOWN:
+                    break
+        tasks.append(asyncio.create_task(_drain_rank_queue(), name="rank_drain"))
+
     # Wait for all stages to complete
-    await asyncio.gather(scraper_task, normalizer_task, ranker_task)
+    await asyncio.gather(*tasks)
 
     duration = round(time.monotonic() - start, 2)
 
@@ -549,6 +697,11 @@ async def _async_main() -> None:
         help="Scrape and normalize only (skip LLM ranking)",
     )
     parser.add_argument(
+        "--tailor",
+        action="store_true",
+        help="Enable Phase 2 tailoring stage (requires LLM_API_KEY)",
+    )
+    parser.add_argument(
         "--top",
         type=int,
         help="Show top N matches after pipeline completes",
@@ -564,6 +717,7 @@ async def _async_main() -> None:
             location=args.location,
             max_results=args.max_results,
             rank=not args.no_rank,
+            tailor=args.tailor,
         )
 
     _print_results(stats)

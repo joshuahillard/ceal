@@ -18,13 +18,11 @@ Interview talking point:
 from __future__ import annotations
 
 from enum import Enum
-from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 # Re-using entities from Phase 1 to maintain normalized data structures
 from src.models.entities import Proficiency, SkillCategory
-
 
 # ---------------------------------------------------------------------------
 # Resume Section Enum
@@ -47,8 +45,8 @@ class ParsedBullet(BaseModel):
     """Represents a single atomic bullet point from a resume."""
     section: ResumeSection
     original_text: str = Field(..., min_length=10)
-    skills_referenced: List[str] = Field(default_factory=list)
-    metrics: List[str] = Field(default_factory=list)
+    skills_referenced: list[str] = Field(default_factory=list)
+    metrics: list[str] = Field(default_factory=list)
 
     @field_validator("original_text")
     @classmethod
@@ -61,11 +59,11 @@ class ParsedBullet(BaseModel):
 class ParsedResume(BaseModel):
     """The structured hierarchy of the parsed master resume."""
     profile_id: int
-    sections: List[ParsedBullet] = Field(default_factory=list)
+    sections: list[ParsedBullet] = Field(default_factory=list)
     raw_text: str
 
     @model_validator(mode="after")
-    def ensure_data_integrity(self) -> "ParsedResume":
+    def ensure_data_integrity(self) -> ParsedResume:
         if not self.sections and not self.raw_text:
             raise ValueError(
                 "ParsedResume must contain extracted sections or raw text fallback."
@@ -83,10 +81,10 @@ class SkillGap(BaseModel):
     category: SkillCategory
     job_requires: bool = True
     resume_has: bool = False
-    proficiency: Optional[Proficiency] = None
+    proficiency: Proficiency | None = None
 
     @model_validator(mode="after")
-    def validate_proficiency_logic(self) -> "SkillGap":
+    def validate_proficiency_logic(self) -> SkillGap:
         if self.resume_has and not self.proficiency:
             raise ValueError(
                 "If resume_has is True, candidate proficiency must be mapped."
@@ -103,7 +101,7 @@ class TailoringRequest(BaseModel):
     job_id: int
     profile_id: int
     target_tier: int = Field(..., ge=1, le=3)
-    emphasis_areas: List[str] = Field(default_factory=list)
+    emphasis_areas: list[str] = Field(default_factory=list)
 
     @field_validator("target_tier")
     @classmethod
@@ -130,7 +128,7 @@ class TailoredBullet(BaseModel):
     relevance_score: float = Field(..., ge=0.0, le=1.0)
 
     @model_validator(mode="after")
-    def enforce_xyz_compliance(self) -> "TailoredBullet":
+    def enforce_xyz_compliance(self) -> TailoredBullet:
         """
         Strict validation for Google X-Y-Z formatting logic.
 
@@ -159,15 +157,20 @@ class TailoredBullet(BaseModel):
 class TailoringResult(BaseModel):
     """The final output contract from the tailoring stage."""
     request: TailoringRequest
-    tailored_bullets: List[TailoredBullet]
-    skill_gaps: List[SkillGap]
+    tailored_bullets: list[TailoredBullet]
+    skill_gaps: list[SkillGap]
     tailoring_version: str
 
     @field_validator("tailoring_version")
     @classmethod
     def validate_versioning(cls, v: str) -> str:
+        """
+        Tailoring version must start with 'v' for prompt A/B tracking.
+        Format: v1.0, v2.0-beta, etc.
+        """
         if not v.startswith("v"):
             raise ValueError(
-                "tailoring_version must track prompt iterations (e.g., v1.0)."
+                "tailoring_version must start with 'v' for prompt "
+                "iteration tracking (e.g., 'v1.0', 'v2.0-beta')."
             )
         return v
