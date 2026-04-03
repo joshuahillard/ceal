@@ -55,6 +55,50 @@ Always run `pytest tests/ -v` and `ruff check src/ tests/` before committing.
 
 If a sprint prompt references files or functions you can't find, STOP and report what's missing. Do not fabricate code. The project has been through a branch reset and some components may not be on `main` yet.
 
+### Session Notes (MANDATORY)
+
+After completing ANY work session (sprint, bug fix, code review, consultation), you MUST create a session note before your final commit. This is how the other AIs (Claude, Gemini) stay in sync with your work.
+
+**File location:** `docs/session_notes/YYYY-MM-DD_short-description.md`
+
+**Required sections:**
+```markdown
+# Ceal Session Notes — [Day] [Date]
+
+**Session type:** [Sprint execution / Bug fix / Code review / Consultation]
+**AI platform:** Codex
+**Commit(s):** [hash(es)]
+
+## Objective
+[1-2 sentences: what was the goal]
+
+## Tasks Completed
+| # | Task | Files | Status |
+|---|------|-------|--------|
+
+## Files Changed
+[List new/modified files with line counts and purpose]
+
+## Test Results
+| Metric | Value |
+|--------|-------|
+| Total tests | |
+| Passed | |
+| Failed | |
+| Lint errors | |
+
+## Architecture Decisions
+[Any non-obvious choices and why]
+
+## What's NOT in This Session
+[Scope boundaries — what was intentionally deferred]
+
+## Career Translation (X-Y-Z Bullet)
+> Accomplished [X] as measured by [Y], by doing [Z]
+```
+
+**Commit the session note as part of your final commit.** The note must be included in the same push so it's immediately visible to all platforms.
+
 ### Sprint Prompts
 
 Sprint prompts live in `docs/ai-onboarding/sprints/` or are provided directly. They follow the 8-Pillar Framework documented in `SPRINT_TEMPLATE.md`.
