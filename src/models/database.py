@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 import structlog
@@ -38,6 +39,7 @@ from sqlalchemy.pool import StaticPool
 
 from src.models.compat import get_database_url, is_sqlite
 from src.models.entities import (
+    ApplicationCreate,
     JobListingCreate,
     RankedResult,
     ScrapeLogCreate,
@@ -642,3 +644,351 @@ async def get_pipeline_stats() -> dict:
             "total_ranked": score_row[1] if score_row else 0,
             "latest_scrape": dict(latest_scrape._mapping) if latest_scrape else None,
         }
+
+
+# ---------------------------------------------------------------------------
+# CRM: Job Status State Machine + Queries
+# ---------------------------------------------------------------------------
+
+VALID_TRANSITIONS: dict[str, set[str]] = {
+    "scraped": {"ranked", "archived"},
+    "ranked": {"applied", "archived"},
+    "applied": {"responded", "interviewing", "rejected", "archived"},
+    "responded": {"interviewing", "rejected", "archived"},
+    "interviewing": {"offer", "rejected", "archived"},
+    "offer": {"archived"},
+    "rejected": {"archived"},
+    "archived": {"ranked"},
+}
+
+
+async def update_job_status(job_id: int, new_status: str, notes: str | None = None) -> dict:
+    """
+    Transition a job to a new status with state-machine validation.
+
+    Returns the updated job dict or raises ValueError for invalid transitions.
+    """
+    del notes  # reserved for future use
+
+    async with get_session() as session:
+        result = await session.execute(
+            text("SELECT id, status, title, company_name FROM job_listings WHERE id = :job_id"),
+            {"job_id": job_id},
+        )
+        job = result.first()
+        if not job:
+            raise ValueError(f"Job {job_id} not found")
+
+        current_status = job[1]
+        valid_next = VALID_TRANSITIONS.get(current_status, set())
+
+        if new_status not in valid_next:
+            raise ValueError(
+                f"Invalid transition: {current_status} -> {new_status}. "
+                f"Valid transitions from '{current_status}': {valid_next or 'none (terminal state)'}"
+            )
+
+        await session.execute(
+            text("""
+                UPDATE job_listings
+                SET status = :new_status
+                WHERE id = :job_id
+            """),
+            {"new_status": new_status, "job_id": job_id},
+        )
+
+    logger.info("job_status_updated", job_id=job_id, from_status=current_status, to_status=new_status)
+    return {"job_id": job_id, "previous_status": current_status, "new_status": new_status}
+
+
+async def get_jobs_by_status(status: str, limit: int = 100) -> list[dict]:
+    """Get all jobs with a specific status, ordered by score and tier."""
+    async with get_session() as session:
+        result = await session.execute(
+            text("""
+                SELECT id, title, company_name, company_tier, match_score,
+                       match_reasoning, url, location, remote_type,
+                       salary_min, salary_max, status, updated_at
+                FROM job_listings
+                WHERE status = :status
+                ORDER BY
+                    CASE WHEN match_score IS NULL THEN 1 ELSE 0 END,
+                    match_score DESC,
+                    CASE WHEN company_tier IS NULL THEN 1 ELSE 0 END,
+                    company_tier ASC
+                LIMIT :limit
+            """),
+            {"status": status, "limit": limit},
+        )
+        return [dict(row._mapping) for row in result]
+
+
+async def get_application_summary() -> dict:
+    """
+    Get counts for each status in the job application lifecycle.
+
+    Powers the CRM Kanban board columns.
+    """
+    async with get_session() as session:
+        result = await session.execute(
+            text("""
+                SELECT status, COUNT(*) as count
+                FROM job_listings
+                GROUP BY status
+                ORDER BY CASE status
+                    WHEN 'scraped' THEN 1
+                    WHEN 'ranked' THEN 2
+                    WHEN 'applied' THEN 3
+                    WHEN 'responded' THEN 4
+                    WHEN 'interviewing' THEN 5
+                    WHEN 'offer' THEN 6
+                    WHEN 'rejected' THEN 7
+                    WHEN 'archived' THEN 8
+                END
+            """)
+        )
+        return {row[0]: row[1] for row in result}
+
+
+async def get_stale_applications(days: int = 7) -> list[dict]:
+    """
+    Find applications that haven't been updated in N days.
+
+    Only flags jobs in active states (applied, responded, interviewing).
+    """
+    from datetime import timedelta
+
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    async with get_session() as session:
+        result = await session.execute(
+            text("""
+                SELECT id, title, company_name, company_tier, match_score,
+                       status, updated_at
+                FROM job_listings
+                WHERE status IN ('applied', 'responded', 'interviewing')
+                  AND updated_at <= :cutoff
+                ORDER BY updated_at ASC
+            """),
+            {"cutoff": cutoff},
+        )
+
+        rows = []
+        now_dt = datetime.now(timezone.utc)
+        for row in result:
+            row_dict = dict(row._mapping)
+            updated_value = row_dict.get("updated_at")
+            try:
+                if isinstance(updated_value, datetime):
+                    updated_dt = updated_value.astimezone(timezone.utc) if updated_value.tzinfo else updated_value.replace(tzinfo=timezone.utc)
+                else:
+                    updated_dt = datetime.strptime(updated_value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                row_dict["days_stale"] = (now_dt - updated_dt).days
+            except (TypeError, ValueError):
+                row_dict["days_stale"] = days
+            rows.append(row_dict)
+
+        return rows
+
+
+# ---------------------------------------------------------------------------
+# Phase 4: Auto-Apply
+# ---------------------------------------------------------------------------
+
+async def create_application(app: ApplicationCreate) -> int:
+    """
+    Create a new application draft with pre-filled fields.
+
+    Applications are idempotent per (job_id, profile_id).
+    """
+    async with get_session() as session:
+        await session.execute(
+            text("""
+                INSERT INTO applications (job_id, profile_id, cover_letter, confidence_score, notes)
+                VALUES (:job_id, :profile_id, :cover_letter, :confidence_score, :notes)
+                ON CONFLICT(job_id, profile_id) DO UPDATE SET
+                    cover_letter = :cover_letter,
+                    confidence_score = :confidence_score,
+                    notes = :notes,
+                    status = 'draft'
+            """),
+            {
+                "job_id": app.job_id,
+                "profile_id": app.profile_id,
+                "cover_letter": app.cover_letter,
+                "confidence_score": app.confidence_score,
+                "notes": app.notes,
+            },
+        )
+
+        app_id_result = await session.execute(
+            text("SELECT id FROM applications WHERE job_id = :job_id AND profile_id = :profile_id"),
+            {"job_id": app.job_id, "profile_id": app.profile_id},
+        )
+        app_id = app_id_result.scalar_one()
+
+        for field in app.fields:
+            await session.execute(
+                text("""
+                    INSERT INTO application_fields (
+                        application_id, field_name, field_type, field_value, confidence, source
+                    )
+                    VALUES (
+                        :app_id, :field_name, :field_type, :field_value, :confidence, :source
+                    )
+                    ON CONFLICT(application_id, field_name) DO UPDATE SET
+                        field_value = :field_value,
+                        confidence = :confidence,
+                        source = :source
+                """),
+                {
+                    "app_id": app_id,
+                    "field_name": field.field_name,
+                    "field_type": field.field_type.value,
+                    "field_value": field.field_value,
+                    "confidence": field.confidence,
+                    "source": field.source.value if field.source else None,
+                },
+            )
+
+    logger.info("application_created", app_id=app_id, job_id=app.job_id)
+    return app_id
+
+
+async def get_application(app_id: int) -> dict | None:
+    """Get a single application with its fields and joined job data."""
+    async with get_session() as session:
+        result = await session.execute(
+            text("""
+                SELECT a.id, a.job_id, a.profile_id, a.status, a.cover_letter,
+                       a.confidence_score, a.notes, a.created_at, a.updated_at, a.submitted_at,
+                       j.title as job_title, j.company_name, j.company_tier,
+                       j.match_score, j.url
+                FROM applications a
+                JOIN job_listings j ON a.job_id = j.id
+                WHERE a.id = :app_id
+            """),
+            {"app_id": app_id},
+        )
+        app_row = result.first()
+        if not app_row:
+            return None
+
+        app_dict = dict(app_row._mapping)
+
+        fields_result = await session.execute(
+            text("""
+                SELECT field_name, field_type, field_value, confidence, source
+                FROM application_fields
+                WHERE application_id = :app_id
+                ORDER BY id
+            """),
+            {"app_id": app_id},
+        )
+        app_dict["fields"] = [dict(row._mapping) for row in fields_result]
+
+    return app_dict
+
+
+async def get_approval_queue(status: str = "draft") -> list[dict]:
+    """Get application drafts/queue items with joined job data."""
+    async with get_session() as session:
+        result = await session.execute(
+            text("""
+                SELECT a.id, a.job_id, a.profile_id, a.status, a.cover_letter,
+                       a.confidence_score, a.notes, a.created_at, a.updated_at,
+                       j.title as job_title, j.company_name, j.company_tier,
+                       j.match_score, j.url
+                FROM applications a
+                JOIN job_listings j ON a.job_id = j.id
+                WHERE a.status = :status
+                ORDER BY
+                    CASE WHEN a.confidence_score IS NULL THEN 1 ELSE 0 END,
+                    a.confidence_score DESC,
+                    CASE WHEN j.match_score IS NULL THEN 1 ELSE 0 END,
+                    j.match_score DESC
+            """),
+            {"status": status},
+        )
+        return [dict(row._mapping) for row in result]
+
+
+_APP_VALID_TRANSITIONS: dict[str, set[str]] = {
+    "draft": {"ready", "withdrawn"},
+    "ready": {"approved", "draft", "withdrawn"},
+    "approved": {"submitted", "draft", "withdrawn"},
+    "submitted": {"withdrawn"},
+    "withdrawn": {"draft"},
+}
+
+
+async def update_application_status(app_id: int, new_status: str) -> dict:
+    """
+    Transition an application with state-machine validation.
+
+    When transitioning to 'approved', also transition the parent job to
+    'applied' to keep CRM and approval flow in sync.
+    """
+    async with get_session() as session:
+        result = await session.execute(
+            text("SELECT id, status, job_id FROM applications WHERE id = :app_id"),
+            {"app_id": app_id},
+        )
+        app_row = result.first()
+        if not app_row:
+            raise ValueError(f"Application {app_id} not found")
+
+        current_status = app_row[1]
+        valid_next = _APP_VALID_TRANSITIONS.get(current_status, set())
+
+        if new_status not in valid_next:
+            raise ValueError(
+                f"Invalid application transition: {current_status} -> {new_status}. "
+                f"Valid: {valid_next or 'none'}"
+            )
+
+        update_fields = {"new_status": new_status, "app_id": app_id}
+
+        if new_status == "submitted":
+            update_fields["submitted_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            await session.execute(
+                text("""
+                    UPDATE applications
+                    SET status = :new_status, submitted_at = :submitted_at
+                    WHERE id = :app_id
+                """),
+                update_fields,
+            )
+        else:
+            await session.execute(
+                text("UPDATE applications SET status = :new_status WHERE id = :app_id"),
+                update_fields,
+            )
+
+    if new_status == "approved":
+        job_id = app_row[2]
+        try:
+            await update_job_status(job_id, "applied")
+        except ValueError:
+            pass
+
+    logger.info(
+        "application_status_updated",
+        app_id=app_id,
+        from_status=current_status,
+        to_status=new_status,
+    )
+    return {"app_id": app_id, "previous_status": current_status, "new_status": new_status}
+
+
+async def get_application_stats() -> dict:
+    """Get application counts by status for the dashboard and queue tabs."""
+    async with get_session() as session:
+        result = await session.execute(
+            text("""
+                SELECT status, COUNT(*) as count
+                FROM applications
+                GROUP BY status
+            """)
+        )
+        return {row[0]: row[1] for row in result}

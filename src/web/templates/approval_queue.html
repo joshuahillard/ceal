@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Auto-Apply Queue — Céal{% endblock %}
+
+{% block content %}
+<h1>Auto-Apply Queue</h1>
+
+<div class="status-tabs">
+    {% for s in ["draft", "ready", "approved", "submitted", "withdrawn"] %}
+    <a href="/apply?status={{ s }}" class="status-tab {% if current_filter == s %}active{% endif %}">
+        {{ s | title }}
+        {% if stats.get(s) %}<span class="badge">{{ stats[s] }}</span>{% endif %}
+    </a>
+    {% endfor %}
+</div>
+
+<div class="summary-bar">
+    <span class="summary-item"><strong>{{ stats.values() | sum }}</strong> total applications</span>
+    {% for s, count in stats.items() %}
+    <span class="summary-item"><strong>{{ count }}</strong> {{ s }}</span>
+    {% endfor %}
+    <a href="/jobs" class="btn" style="margin-left: auto; font-size: 0.85rem;">Pre-Fill from Jobs</a>
+</div>
+
+{% if queue %}
+<div class="queue-grid">
+    {% for app in queue %}
+    <div class="card {% if app.company_tier == 1 %}tier-1-accent{% elif app.company_tier == 2 %}tier-2-accent{% elif app.company_tier == 3 %}tier-3-accent{% endif %}">
+        <div class="kanban-card-company">{{ app.company_name }}</div>
+        <div class="kanban-card-title">{{ app.job_title }}</div>
+        <div class="kanban-card-meta">
+            {% if app.match_score %}
+            {% set score_pct = (app.match_score * 100) | round | int %}
+            <span class="badge {% if score_pct >= 70 %}badge-green{% elif score_pct >= 50 %}badge-yellow{% else %}badge-red{% endif %}">
+                {{ score_pct }}% match
+            </span>
+            {% endif %}
+            {% if app.company_tier %}
+            <span class="badge">T{{ app.company_tier }}</span>
+            {% endif %}
+            {% if app.confidence_score is not none %}
+            <span class="confidence-bar-wrap">
+                {% set conf_pct = (app.confidence_score * 100) | round | int %}
+                <span class="confidence-bar {% if app.confidence_score >= 0.8 %}confidence-high{% elif app.confidence_score >= 0.5 %}confidence-med{% else %}confidence-low{% endif %}" style="width: {{ conf_pct }}%"></span>
+            </span>
+            <span class="muted" style="font-size: 0.75rem;">{{ conf_pct }}% confidence</span>
+            {% endif %}
+        </div>
+        <div class="muted" style="font-size: 0.75rem; margin: 0.25rem 0;">
+            {% if app.notes %}{{ app.notes }}{% endif %}
+        </div>
+        <div class="muted" style="font-size: 0.7rem;">Created {{ app.created_at }}</div>
+        <div class="kanban-card-actions">
+            {% if current_filter == "draft" %}
+            <a href="/apply/{{ app.id }}" class="status-btn">Review &rarr;</a>
+            <form method="post" action="/apply/{{ app.id }}/status" style="display:inline">
+                <input type="hidden" name="new_status" value="withdrawn">
+                <button type="submit" class="status-btn status-btn-muted">Withdraw</button>
+            </form>
+            {% elif current_filter == "ready" %}
+            <form method="post" action="/apply/{{ app.id }}/status" style="display:inline">
+                <input type="hidden" name="new_status" value="approved">
+                <button type="submit" class="status-btn">Approve</button>
+            </form>
+            <form method="post" action="/apply/{{ app.id }}/status" style="display:inline">
+                <input type="hidden" name="new_status" value="draft">
+                <button type="submit" class="status-btn status-btn-muted">Back to Draft</button>
+            </form>
+            <form method="post" action="/apply/{{ app.id }}/status" style="display:inline">
+                <input type="hidden" name="new_status" value="withdrawn">
+                <button type="submit" class="status-btn status-btn-muted">Withdraw</button>
+            </form>
+            {% elif current_filter == "approved" %}
+            <form method="post" action="/apply/{{ app.id }}/status" style="display:inline">
+                <input type="hidden" name="new_status" value="submitted">
+                <button type="submit" class="status-btn">Mark Submitted</button>
+            </form>
+            <form method="post" action="/apply/{{ app.id }}/status" style="display:inline">
+                <input type="hidden" name="new_status" value="draft">
+                <button type="submit" class="status-btn status-btn-muted">Back to Draft</button>
+            </form>
+            <form method="post" action="/apply/{{ app.id }}/status" style="display:inline">
+                <input type="hidden" name="new_status" value="withdrawn">
+                <button type="submit" class="status-btn status-btn-muted">Withdraw</button>
+            </form>
+            {% elif current_filter == "submitted" %}
+            <form method="post" action="/apply/{{ app.id }}/status" style="display:inline">
+                <input type="hidden" name="new_status" value="withdrawn">
+                <button type="submit" class="status-btn status-btn-muted">Withdraw</button>
+            </form>
+            {% elif current_filter == "withdrawn" %}
+            <form method="post" action="/apply/{{ app.id }}/status" style="display:inline">
+                <input type="hidden" name="new_status" value="draft">
+                <button type="submit" class="status-btn">Re-draft</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <p>No applications in <strong>{{ current_filter }}</strong> status.</p>
+    <p class="muted">Use the Pre-Fill button on the <a href="/jobs">Jobs page</a> to get started.</p>
+</div>
+{% endif %}
+{% endblock %}

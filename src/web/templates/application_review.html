@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Review Application — Céal{% endblock %}
+
+{% block content %}
+<h1>Application Review</h1>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+{% if application %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <h2 style="margin: 0;">{{ application.company_name }}</h2>
+            <p style="margin: 0.25rem 0; color: var(--text-muted);">{{ application.job_title }}</p>
+            {% if application.url %}
+            <a href="{{ application.url }}" target="_blank" rel="noopener" style="font-size: 0.85rem;">View original listing</a>
+            {% endif %}
+        </div>
+        <div style="text-align: right;">
+            {% if application.match_score is not none %}
+            {% set score_pct = (application.match_score * 100) | round | int %}
+            <span class="badge {% if score_pct >= 70 %}badge-green{% elif score_pct >= 50 %}badge-yellow{% else %}badge-red{% endif %}" style="font-size: 1rem;">
+                {{ score_pct }}% match
+            </span>
+            {% endif %}
+            {% if application.company_tier %}
+            <span class="badge" style="font-size: 1rem;">Tier {{ application.company_tier }}</span>
+            {% endif %}
+            {% if application.confidence_score is not none %}
+            <div style="margin-top: 0.5rem;">
+                {% set conf_pct = (application.confidence_score * 100) | round | int %}
+                <span class="confidence-bar-wrap" style="width: 120px;">
+                    <span class="confidence-bar {% if application.confidence_score >= 0.8 %}confidence-high{% elif application.confidence_score >= 0.5 %}confidence-med{% else %}confidence-low{% endif %}" style="width: {{ conf_pct }}%"></span>
+                </span>
+                <span class="muted" style="font-size: 0.8rem;">{{ conf_pct }}% confidence</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <div style="margin-top: 0.75rem;">
+        <span class="badge">Status: {{ application.status | title }}</span>
+        <span class="muted" style="font-size: 0.8rem; margin-left: 0.5rem;">Created {{ application.created_at }}</span>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3>Cover Letter</h3>
+    <textarea rows="6" style="width: 100%;" readonly>{{ application.cover_letter or "No cover letter generated yet. Future versions will use LLM generation." }}</textarea>
+</div>
+
+{% if application.fields %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3>Pre-Filled Fields</h3>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Field</th>
+                <th>Type</th>
+                <th>Value</th>
+                <th>Confidence</th>
+                <th>Source</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for field in application.fields %}
+            <tr class="review-field">
+                <td style="font-weight: 600; white-space: nowrap;">{{ field.field_name | replace("_", " ") | title }}</td>
+                <td><span class="badge" style="font-size: 0.7rem;">{{ field.field_type }}</span></td>
+                <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">
+                    {% if field.field_value %}
+                    {% if field.field_value | length > 100 %}
+                    {{ field.field_value[:100] }}...
+                    {% else %}
+                    {{ field.field_value }}
+                    {% endif %}
+                    {% else %}
+                    <span class="muted">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if field.confidence is not none %}
+                    {% set conf = field.confidence %}
+                    <span class="confidence-dot {% if conf >= 0.8 %}confidence-high{% elif conf >= 0.5 %}confidence-med{% else %}confidence-low{% endif %}"></span>
+                    {{ (conf * 100) | round | int }}%
+                    {% else %}
+                    <span class="muted">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if field.source %}
+                    <span class="source-badge source-{{ field.source }}">{{ field.source }}</span>
+                    {% else %}
+                    <span class="muted">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3>Notes</h3>
+    <textarea rows="3" style="width: 100%;" readonly>{{ application.notes or "" }}</textarea>
+</div>
+
+<div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+    {% if application.status == "draft" %}
+    <form method="post" action="/apply/{{ application.id }}/status" style="display:inline">
+        <input type="hidden" name="new_status" value="ready">
+        <button type="submit" class="btn">Mark Ready</button>
+    </form>
+    {% elif application.status == "ready" %}
+    <form method="post" action="/apply/{{ application.id }}/status" style="display:inline">
+        <input type="hidden" name="new_status" value="approved">
+        <button type="submit" class="btn">Approve</button>
+    </form>
+    {% elif application.status == "approved" %}
+    <form method="post" action="/apply/{{ application.id }}/status" style="display:inline">
+        <input type="hidden" name="new_status" value="submitted">
+        <button type="submit" class="btn">Mark Submitted</button>
+    </form>
+    {% endif %}
+    {% if application.status != "withdrawn" %}
+    <form method="post" action="/apply/{{ application.id }}/status" style="display:inline">
+        <input type="hidden" name="new_status" value="withdrawn">
+        <button type="submit" class="status-btn status-btn-muted" style="padding: 0.5rem 1rem;">Withdraw</button>
+    </form>
+    {% else %}
+    <form method="post" action="/apply/{{ application.id }}/status" style="display:inline">
+        <input type="hidden" name="new_status" value="draft">
+        <button type="submit" class="btn">Re-draft</button>
+    </form>
+    {% endif %}
+    <a href="/apply" class="btn" style="background: var(--text-muted);">Back to Queue</a>
+</div>
+
+{% else %}
+<div class="empty-state">
+    <p>Application not found.</p>
+    <a href="/apply">Back to Queue</a>
+</div>
+{% endif %}
+{% endblock %}

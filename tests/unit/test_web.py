@@ -51,11 +51,27 @@ class TestDashboard:
             "total_ranked": 5,
             "latest_scrape": None,
         }
-        with patch("src.web.routes.dashboard.get_pipeline_stats", new_callable=AsyncMock, return_value=mock_stats):
+        with (
+            patch("src.web.routes.dashboard.get_pipeline_stats", new_callable=AsyncMock, return_value=mock_stats),
+            patch(
+                "src.web.routes.dashboard.get_application_summary",
+                new_callable=AsyncMock,
+                return_value={"ranked": 3, "applied": 2},
+            ),
+            patch("src.web.routes.dashboard.get_stale_applications", new_callable=AsyncMock, return_value=[{"id": 1}]),
+            patch(
+                "src.web.routes.dashboard.get_application_stats",
+                new_callable=AsyncMock,
+                return_value={"draft": 1, "ready": 1},
+            ),
+        ):
             response = await client.get("/")
         assert response.status_code == 200
         assert "Pipeline Dashboard" in response.text
         assert "72%" in response.text
+        assert "Application Pipeline" in response.text
+        assert "Auto-Apply Pipeline" in response.text
+        assert "Follow-Up Reminders" in response.text
 
     @pytest.mark.asyncio
     async def test_dashboard_empty_state(self, client):
@@ -67,10 +83,17 @@ class TestDashboard:
             "total_ranked": 0,
             "latest_scrape": None,
         }
-        with patch("src.web.routes.dashboard.get_pipeline_stats", new_callable=AsyncMock, return_value=mock_stats):
+        with (
+            patch("src.web.routes.dashboard.get_pipeline_stats", new_callable=AsyncMock, return_value=mock_stats),
+            patch("src.web.routes.dashboard.get_application_summary", new_callable=AsyncMock, return_value={}),
+            patch("src.web.routes.dashboard.get_stale_applications", new_callable=AsyncMock, return_value=[]),
+            patch("src.web.routes.dashboard.get_application_stats", new_callable=AsyncMock, return_value={}),
+        ):
             response = await client.get("/")
         assert response.status_code == 200
         assert "No jobs in pipeline yet" in response.text
+        assert "No applications tracked yet" in response.text
+        assert "No auto-apply drafts yet" in response.text
 
 
 # ---------------------------------------------------------------------------
@@ -102,6 +125,7 @@ class TestJobs:
         assert response.status_code == 200
         assert "Stripe" in response.text
         assert "85%" in response.text
+        assert "Pre-Fill" in response.text
 
     @pytest.mark.asyncio
     async def test_jobs_empty(self, client):

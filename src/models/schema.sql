@@ -172,6 +172,48 @@ CREATE INDEX IF NOT EXISTS idx_tailoring_requests_profile ON tailoring_requests(
 CREATE INDEX IF NOT EXISTS idx_tailored_bullets_request ON tailored_bullets(request_id);
 CREATE INDEX IF NOT EXISTS idx_skill_gaps_request ON skill_gaps(request_id);
 
+-- =========================================================================
+-- Phase 4: CRM + Auto-Apply Tables
+-- =========================================================================
+
+CREATE TABLE IF NOT EXISTS applications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER NOT NULL REFERENCES job_listings(id),
+    profile_id INTEGER NOT NULL REFERENCES resume_profiles(id),
+    status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'ready', 'approved', 'submitted', 'withdrawn')),
+    cover_letter TEXT,
+    confidence_score REAL CHECK(confidence_score IS NULL OR (confidence_score >= 0.0 AND confidence_score <= 1.0)),
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    submitted_at TEXT,
+    UNIQUE(job_id, profile_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status);
+CREATE INDEX IF NOT EXISTS idx_applications_job_id ON applications(job_id);
+
+CREATE TABLE IF NOT EXISTS application_fields (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    application_id INTEGER NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+    field_name TEXT NOT NULL,
+    field_type TEXT NOT NULL DEFAULT 'text' CHECK(field_type IN ('text', 'textarea', 'select', 'checkbox', 'radio', 'file', 'date', 'email', 'phone', 'url')),
+    field_value TEXT,
+    confidence REAL CHECK(confidence IS NULL OR (confidence >= 0.0 AND confidence <= 1.0)),
+    source TEXT CHECK(source IS NULL OR source IN ('resume', 'profile', 'tailored', 'manual', 'ai_generated')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(application_id, field_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_appfields_application_id ON application_fields(application_id);
+
+CREATE TRIGGER IF NOT EXISTS trg_applications_updated_at
+    AFTER UPDATE ON applications
+    FOR EACH ROW
+BEGIN
+    UPDATE applications SET updated_at = datetime('now') WHERE id = OLD.id;
+END;
+
 -- Seed Tier 1-3 companies
 INSERT OR IGNORE INTO company_tiers (company_pattern, tier, notes) VALUES
     ('Stripe', 1, 'Tier 1 - TSE/Solutions roles');

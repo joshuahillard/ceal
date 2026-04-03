@@ -48,9 +48,9 @@ async def demo_form(request: Request):
         resume_text = _RESUME_PATH.read_text(encoding="utf-8")
 
     return templates.TemplateResponse(
+        request,
         "demo.html",
-        {
-            "request": request,
+        context={
             "resume_text": resume_text,
             "results": None,
         },
@@ -125,9 +125,9 @@ async def demo_run(
                 errors.append(f"LLM tailoring failed: {exc}")
 
     return templates.TemplateResponse(
+        request,
         "demo.html",
-        {
-            "request": request,
+        context={
             "resume_text": resume_text,
             "results": {
                 "skill_gaps": skill_gaps,

@@ -152,6 +152,62 @@ CREATE TABLE IF NOT EXISTS skill_gaps (
 );
 
 -- =========================================================================
+-- Phase 4: CRM + Auto-Apply Tables
+-- =========================================================================
+
+CREATE TABLE IF NOT EXISTS applications (
+    id SERIAL PRIMARY KEY,
+    job_id INTEGER NOT NULL REFERENCES job_listings(id),
+    profile_id INTEGER NOT NULL REFERENCES resume_profiles(id),
+    status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'ready', 'approved', 'submitted', 'withdrawn')),
+    cover_letter TEXT,
+    confidence_score DOUBLE PRECISION CHECK(confidence_score IS NULL OR (confidence_score >= 0.0 AND confidence_score <= 1.0)),
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+    updated_at TEXT NOT NULL DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+    submitted_at TEXT,
+    UNIQUE(job_id, profile_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status);
+CREATE INDEX IF NOT EXISTS idx_applications_job_id ON applications(job_id);
+
+CREATE TABLE IF NOT EXISTS application_fields (
+    id SERIAL PRIMARY KEY,
+    application_id INTEGER NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+    field_name TEXT NOT NULL,
+    field_type TEXT NOT NULL DEFAULT 'text' CHECK(field_type IN ('text', 'textarea', 'select', 'checkbox', 'radio', 'file', 'date', 'email', 'phone', 'url')),
+    field_value TEXT,
+    confidence DOUBLE PRECISION CHECK(confidence IS NULL OR (confidence >= 0.0 AND confidence <= 1.0)),
+    source TEXT CHECK(source IS NULL OR source IN ('resume', 'profile', 'tailored', 'manual', 'ai_generated')),
+    created_at TEXT NOT NULL DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+    UNIQUE(application_id, field_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_appfields_application_id ON application_fields(application_id);
+
+CREATE OR REPLACE FUNCTION trg_applications_updated_at_fn()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"');
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgname = 'trg_applications_updated_at'
+    ) THEN
+        CREATE TRIGGER trg_applications_updated_at
+            BEFORE UPDATE ON applications
+            FOR EACH ROW
+            EXECUTE FUNCTION trg_applications_updated_at_fn();
+    END IF;
+END;
+$$;
+
+-- =========================================================================
 -- Indexes
 -- =========================================================================
 
@@ -169,10 +225,6 @@ CREATE INDEX IF NOT EXISTS idx_tailoring_requests_job ON tailoring_requests(job_
 CREATE INDEX IF NOT EXISTS idx_tailoring_requests_profile ON tailoring_requests(profile_id);
 CREATE INDEX IF NOT EXISTS idx_tailored_bullets_request ON tailored_bullets(request_id);
 CREATE INDEX IF NOT EXISTS idx_skill_gaps_request ON skill_gaps(request_id);
-
--- =========================================================================
--- Trigger: auto-update updated_at timestamp (PostgreSQL syntax)
--- =========================================================================
 
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$

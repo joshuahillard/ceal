@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Reminders — Céal{% endblock %}
+
+{% block content %}
+<h1>Follow-Up Reminders</h1>
+
+<form class="filter-bar" method="get" action="/applications/reminders">
+    <label>
+        Stale Threshold (days)
+        <input type="range" name="days" min="1" max="30" value="{{ days_threshold }}"
+               oninput="this.nextElementSibling.textContent = this.value + ' days'">
+        <span>{{ days_threshold }} days</span>
+    </label>
+    <button type="submit" class="btn">Filter</button>
+</form>
+
+{% if stale_jobs %}
+<table class="table">
+    <thead>
+        <tr>
+            <th>Title</th>
+            <th>Company</th>
+            <th>Status</th>
+            <th>Last Updated</th>
+            <th>Days Stale</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for job in stale_jobs %}
+        <tr>
+            <td>{{ job.title }}</td>
+            <td>{{ job.company_name }}</td>
+            <td><span class="badge badge-yellow">{{ job.status }}</span></td>
+            <td>{{ job.updated_at }}</td>
+            <td><strong>{{ job.days_stale }}</strong></td>
+            <td>
+                {% set transitions = {
+                    "applied": ["responded", "interviewing", "rejected", "archived"],
+                    "responded": ["interviewing", "rejected", "archived"],
+                    "interviewing": ["offer", "rejected", "archived"]
+                } %}
+                {% for next_status in transitions.get(job.status, []) %}
+                <form method="post" action="/applications/{{ job.id }}/status" style="display: inline;">
+                    <input type="hidden" name="new_status" value="{{ next_status }}">
+                    <button type="submit" class="status-btn {% if next_status == 'archived' %}status-btn-muted{% endif %}">{{ next_status | title }}</button>
+                </form>
+                {% endfor %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="empty-state">
+    <p>No stale applications — you're on top of things!</p>
+</div>
+{% endif %}
+{% endblock %}

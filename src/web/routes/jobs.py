@@ -19,9 +19,9 @@ async def job_list(
     """Render filtered job listings."""
     jobs = await get_top_matches(min_score=min_score, tier=tier, limit=limit)
     return templates.TemplateResponse(
+        request,
         "jobs.html",
-        {
-            "request": request,
+        context={
             "jobs": jobs,
             "filters": {
                 "min_score": min_score,
