@@ -30,3 +30,15 @@ htmlcov/
 # Pytest
 .pytest_cache/
 pytest-cache-files-*/
+
+# Ruff cache
+.ruff_cache/
+
+# OS files
+desktop.ini
+
+# Local utility scripts
+push_to_github.sh
+
+# Temporary sprint prompts (canonical versions live in docs/ai-onboarding/sprints/)
+CLAUDE_CODE_*.md
