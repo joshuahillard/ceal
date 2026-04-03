@@ -114,6 +114,64 @@ BEGIN
     UPDATE job_listings SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = NEW.id;
 END;
 
+-- =========================================================================
+-- Phase 2: Tailoring Pipeline Tables
+-- =========================================================================
+
+-- Parsed resume bullets (atomic units for tailoring engine)
+CREATE TABLE IF NOT EXISTS parsed_bullets (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id      INTEGER NOT NULL REFERENCES resume_profiles(id) ON DELETE CASCADE,
+    section         TEXT    NOT NULL CHECK(section IN ('SUMMARY', 'EXPERIENCE', 'SKILLS', 'PROJECTS', 'CERTIFICATIONS')),
+    original_text   TEXT    NOT NULL,
+    skills_referenced TEXT,
+    metrics         TEXT,
+    created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    UNIQUE(profile_id, original_text)
+);
+
+-- Tailoring requests (one per job+profile pair)
+CREATE TABLE IF NOT EXISTS tailoring_requests (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id          INTEGER NOT NULL REFERENCES job_listings(id) ON DELETE CASCADE,
+    profile_id      INTEGER NOT NULL REFERENCES resume_profiles(id) ON DELETE CASCADE,
+    target_tier     INTEGER NOT NULL CHECK(target_tier BETWEEN 1 AND 3),
+    emphasis_areas  TEXT,
+    created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    UNIQUE(job_id, profile_id)
+);
+
+-- Tailored bullets (rewritten per request)
+CREATE TABLE IF NOT EXISTS tailored_bullets (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id      INTEGER NOT NULL REFERENCES tailoring_requests(id) ON DELETE CASCADE,
+    original        TEXT    NOT NULL,
+    rewritten_text  TEXT    NOT NULL,
+    xyz_format      BOOLEAN NOT NULL DEFAULT 0,
+    relevance_score REAL    NOT NULL CHECK(relevance_score BETWEEN 0.0 AND 1.0),
+    created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+
+-- Skill gap analysis (per request)
+CREATE TABLE IF NOT EXISTS skill_gaps (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id      INTEGER NOT NULL REFERENCES tailoring_requests(id) ON DELETE CASCADE,
+    skill_name      TEXT    NOT NULL,
+    category        TEXT    NOT NULL CHECK(category IN ('language', 'framework', 'infrastructure', 'database', 'cloud', 'methodology', 'soft_skill', 'domain', 'tool')),
+    job_requires    BOOLEAN NOT NULL DEFAULT 1,
+    resume_has      BOOLEAN NOT NULL DEFAULT 0,
+    proficiency     TEXT    CHECK(proficiency IS NULL OR proficiency IN ('expert', 'proficient', 'familiar', 'learning')),
+    created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    UNIQUE(request_id, skill_name)
+);
+
+-- Phase 2 indexes
+CREATE INDEX IF NOT EXISTS idx_parsed_bullets_profile ON parsed_bullets(profile_id);
+CREATE INDEX IF NOT EXISTS idx_tailoring_requests_job ON tailoring_requests(job_id);
+CREATE INDEX IF NOT EXISTS idx_tailoring_requests_profile ON tailoring_requests(profile_id);
+CREATE INDEX IF NOT EXISTS idx_tailored_bullets_request ON tailored_bullets(request_id);
+CREATE INDEX IF NOT EXISTS idx_skill_gaps_request ON skill_gaps(request_id);
+
 -- Seed Tier 1-3 companies
 INSERT OR IGNORE INTO company_tiers (company_pattern, tier, notes) VALUES
     ('Stripe', 1, 'Tier 1 - TSE/Solutions roles');
