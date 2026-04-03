@@ -109,6 +109,34 @@
     </div>
 </div>
 
+<div class="card-grid" style="margin-top: 1.5rem;">
+    <div class="card">
+        <h3>Regime Classification</h3>
+        {% if regime_stats and regime_stats.total_classified > 0 %}
+        <table class="table-compact">
+            <tr>
+                <td>Tier 1 (Apply Now)</td>
+                <td class="text-right"><strong>{{ regime_stats.tier_1_count }}</strong></td>
+            </tr>
+            <tr>
+                <td>Tier 2 (Credential)</td>
+                <td class="text-right"><strong>{{ regime_stats.tier_2_count }}</strong></td>
+            </tr>
+            <tr>
+                <td>Tier 3 (Campaign)</td>
+                <td class="text-right"><strong>{{ regime_stats.tier_3_count }}</strong></td>
+            </tr>
+            <tr>
+                <td>Unclassified</td>
+                <td class="text-right"><strong>{{ regime_stats.unclassified_count }}</strong></td>
+            </tr>
+        </table>
+        {% else %}
+        <p class="muted">No classifications yet — run with <code>--classify-regimes</code></p>
+        {% endif %}
+    </div>
+</div>
+
 {% if stats.latest_scrape %}
 <div class="card" style="margin-top: 1.5rem;">
     <h3>Latest Scrape</h3>

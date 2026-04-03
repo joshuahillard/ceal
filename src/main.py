@@ -440,6 +440,67 @@ async def run_rank_only(
 
 
 # ---------------------------------------------------------------------------
+# Regime Classification (Vertex AI — opt-in)
+# ---------------------------------------------------------------------------
+
+async def run_classify_regimes() -> dict:
+    """
+    Classify ranked jobs into tier strategies using Vertex AI.
+
+    This is an opt-in pass that runs AFTER the normal pipeline.
+    If Vertex AI is not configured, each job returns None (fail-open)
+    and no data is modified.
+    """
+    await init_db()
+
+    from src.models.database import (
+        get_jobs_missing_regime,
+        get_session,
+        save_regime_classification,
+    )
+    from src.ranker.regime_classifier import classify_regime
+
+    classified = 0
+    skipped = 0
+    total = 0
+
+    async with get_session() as session:
+        jobs = await get_jobs_missing_regime(session)
+        total = len(jobs)
+
+        if not jobs:
+            logger.info("no_jobs_to_classify")
+            return {"total": 0, "classified": 0, "skipped": 0}
+
+        for job in jobs:
+            result = await classify_regime(
+                job_id=job["id"],
+                job_title=job["title"],
+                company_name=job["company_name"],
+                location=job.get("location"),
+                description=job.get("description_clean") or job.get("description_raw"),
+            )
+
+            if result is None:
+                skipped += 1
+                logger.debug("regime_classification_skipped", job_id=job["id"])
+                continue
+
+            await save_regime_classification(session, result.model_dump())
+            classified += 1
+
+    logger.info(
+        "regime_classification_complete",
+        total=total,
+        classified=classified,
+        skipped=skipped,
+    )
+    print(f"\n  Regime classification: {classified}/{total} jobs classified ({skipped} skipped)")
+
+    return {"total": total, "classified": classified, "skipped": skipped}
+
+
+# ---------------------------------------------------------------------------
 # CLI Interface
 # ---------------------------------------------------------------------------
 
@@ -609,6 +670,11 @@ async def _async_main() -> None:
         help="Directory for exported .docx files (default: output/)",
     )
     parser.add_argument(
+        "--classify-regimes",
+        action="store_true",
+        help="Run Vertex AI regime classification on ranked but unclassified jobs",
+    )
+    parser.add_argument(
         "--web",
         action="store_true",
         help="Launch the web UI (default: http://localhost:8000)",
@@ -631,6 +697,11 @@ async def _async_main() -> None:
         config = uvicorn.Config(web_app, host="0.0.0.0", port=args.port, log_level="info")
         server = uvicorn.Server(config)
         await server.serve()
+        return
+
+    # Regime classification mode (Vertex AI — opt-in)
+    if args.classify_regimes:
+        await run_classify_regimes()
         return
 
     # Demo mode — separate pipeline, no DB needed

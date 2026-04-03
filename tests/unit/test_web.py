@@ -51,6 +51,10 @@ class TestDashboard:
             "total_ranked": 5,
             "latest_scrape": None,
         }
+        mock_regime = {
+            "tier_1_count": 3, "tier_2_count": 1, "tier_3_count": 1,
+            "unclassified_count": 0, "total_classified": 5,
+        }
         with (
             patch("src.web.routes.dashboard.get_pipeline_stats", new_callable=AsyncMock, return_value=mock_stats),
             patch(
@@ -64,6 +68,11 @@ class TestDashboard:
                 new_callable=AsyncMock,
                 return_value={"draft": 1, "ready": 1},
             ),
+            patch(
+                "src.web.routes.dashboard._get_regime_stats_safe",
+                new_callable=AsyncMock,
+                return_value=mock_regime,
+            ),
         ):
             response = await client.get("/")
         assert response.status_code == 200
@@ -72,6 +81,7 @@ class TestDashboard:
         assert "Application Pipeline" in response.text
         assert "Auto-Apply Pipeline" in response.text
         assert "Follow-Up Reminders" in response.text
+        assert "Regime Classification" in response.text
 
     @pytest.mark.asyncio
     async def test_dashboard_empty_state(self, client):
@@ -83,17 +93,27 @@ class TestDashboard:
             "total_ranked": 0,
             "latest_scrape": None,
         }
+        mock_regime_empty = {
+            "tier_1_count": 0, "tier_2_count": 0, "tier_3_count": 0,
+            "unclassified_count": 0, "total_classified": 0,
+        }
         with (
             patch("src.web.routes.dashboard.get_pipeline_stats", new_callable=AsyncMock, return_value=mock_stats),
             patch("src.web.routes.dashboard.get_application_summary", new_callable=AsyncMock, return_value={}),
             patch("src.web.routes.dashboard.get_stale_applications", new_callable=AsyncMock, return_value=[]),
             patch("src.web.routes.dashboard.get_application_stats", new_callable=AsyncMock, return_value={}),
+            patch(
+                "src.web.routes.dashboard._get_regime_stats_safe",
+                new_callable=AsyncMock,
+                return_value=mock_regime_empty,
+            ),
         ):
             response = await client.get("/")
         assert response.status_code == 200
         assert "No jobs in pipeline yet" in response.text
         assert "No applications tracked yet" in response.text
         assert "No auto-apply drafts yet" in response.text
+        assert "No classifications yet" in response.text
 
 
 # ---------------------------------------------------------------------------

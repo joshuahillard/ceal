@@ -22,6 +22,11 @@ CREATE TABLE IF NOT EXISTS job_listings (
     match_score     REAL    CHECK(match_score BETWEEN 0.0 AND 1.0),
     match_reasoning TEXT,
     rank_model_version TEXT,
+    recommended_tier        INTEGER,
+    regime_confidence       REAL,
+    regime_reasoning        TEXT,
+    regime_model_version    TEXT,
+    regime_classified_at    TEXT,
     status          TEXT    NOT NULL DEFAULT 'scraped'
                            CHECK(status IN ('scraped','ranked','applied','responded','interviewing','offer','rejected','archived')),
     scraped_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
@@ -105,6 +110,7 @@ CREATE INDEX IF NOT EXISTS idx_job_skills_job ON job_skills(job_id);
 CREATE INDEX IF NOT EXISTS idx_job_skills_skill ON job_skills(skill_id);
 CREATE INDEX IF NOT EXISTS idx_resume_skills_profile ON resume_skills(profile_id);
 CREATE INDEX IF NOT EXISTS idx_scrape_log_source ON scrape_log(source);
+CREATE INDEX IF NOT EXISTS idx_job_listings_recommended_tier ON job_listings(recommended_tier);
 
 -- Trigger: auto-update updated_at timestamp
 CREATE TRIGGER IF NOT EXISTS trg_jobs_updated_at

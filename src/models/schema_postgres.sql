@@ -27,6 +27,11 @@ CREATE TABLE IF NOT EXISTS job_listings (
     match_score     DOUBLE PRECISION CHECK(match_score BETWEEN 0.0 AND 1.0),
     match_reasoning TEXT,
     rank_model_version TEXT,
+    recommended_tier        INTEGER,
+    regime_confidence       DOUBLE PRECISION,
+    regime_reasoning        TEXT,
+    regime_model_version    TEXT,
+    regime_classified_at    TIMESTAMPTZ,
     status          TEXT    NOT NULL DEFAULT 'scraped'
                            CHECK(status IN ('scraped','ranked','applied','responded','interviewing','offer','rejected','archived')),
     scraped_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -220,6 +225,7 @@ CREATE INDEX IF NOT EXISTS idx_job_skills_job ON job_skills(job_id);
 CREATE INDEX IF NOT EXISTS idx_job_skills_skill ON job_skills(skill_id);
 CREATE INDEX IF NOT EXISTS idx_resume_skills_profile ON resume_skills(profile_id);
 CREATE INDEX IF NOT EXISTS idx_scrape_log_source ON scrape_log(source);
+CREATE INDEX IF NOT EXISTS idx_job_listings_recommended_tier ON job_listings(recommended_tier);
 CREATE INDEX IF NOT EXISTS idx_parsed_bullets_profile ON parsed_bullets(profile_id);
 CREATE INDEX IF NOT EXISTS idx_tailoring_requests_job ON tailoring_requests(job_id);
 CREATE INDEX IF NOT EXISTS idx_tailoring_requests_profile ON tailoring_requests(profile_id);

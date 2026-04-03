@@ -992,3 +992,89 @@ async def get_application_stats() -> dict:
             """)
         )
         return {row[0]: row[1] for row in result}
+
+
+# ---------------------------------------------------------------------------
+# Regime Classification Helpers
+# ---------------------------------------------------------------------------
+
+async def get_jobs_missing_regime(session: AsyncSession) -> list[dict]:
+    """
+    Fetch ranked jobs that haven't been classified by the regime classifier yet.
+
+    Only returns jobs that already have a match_score (i.e., have been ranked
+    by the Claude LLM ranker). This ensures we only classify jobs that are
+    already in the pipeline.
+    """
+    result = await session.execute(
+        text("""
+            SELECT id, title, company_name, location, description_clean, description_raw
+            FROM job_listings
+            WHERE recommended_tier IS NULL
+              AND match_score IS NOT NULL
+        """)
+    )
+    return [dict(row._mapping) for row in result]
+
+
+async def save_regime_classification(session: AsyncSession, classification: dict) -> None:
+    """
+    Save a regime classification result to a job listing.
+
+    Idempotent — safe to re-run on already-classified jobs (overwrites).
+    Uses portable ISO timestamp for SQLite; PostgreSQL auto-converts.
+    """
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    await session.execute(
+        text("""
+            UPDATE job_listings
+            SET recommended_tier = :recommended_tier,
+                regime_confidence = :confidence,
+                regime_reasoning = :reasoning,
+                regime_model_version = :model_version,
+                regime_classified_at = :classified_at
+            WHERE id = :job_id
+        """),
+        {
+            "recommended_tier": classification["recommended_tier"],
+            "confidence": classification["confidence"],
+            "reasoning": classification["reasoning"],
+            "model_version": classification["model_version"],
+            "classified_at": now_iso,
+            "job_id": classification["job_id"],
+        },
+    )
+
+
+async def get_regime_stats(session: AsyncSession) -> dict:
+    """
+    Get regime classification counts grouped by tier.
+
+    Returns dict with keys: tier_1_count, tier_2_count, tier_3_count,
+    unclassified_count, total_classified.
+    """
+    result = await session.execute(
+        text("""
+            SELECT
+                COALESCE(SUM(CASE WHEN recommended_tier = 1 THEN 1 ELSE 0 END), 0) as tier_1,
+                COALESCE(SUM(CASE WHEN recommended_tier = 2 THEN 1 ELSE 0 END), 0) as tier_2,
+                COALESCE(SUM(CASE WHEN recommended_tier = 3 THEN 1 ELSE 0 END), 0) as tier_3,
+                COALESCE(SUM(CASE WHEN recommended_tier IS NULL THEN 1 ELSE 0 END), 0) as unclassified
+            FROM job_listings
+            WHERE match_score IS NOT NULL
+        """)
+    )
+    row = result.first()
+    tier_1 = row[0] if row else 0
+    tier_2 = row[1] if row else 0
+    tier_3 = row[2] if row else 0
+    unclassified = row[3] if row else 0
+
+    return {
+        "tier_1_count": tier_1,
+        "tier_2_count": tier_2,
+        "tier_3_count": tier_3,
+        "unclassified_count": unclassified,
+        "total_classified": tier_1 + tier_2 + tier_3,
+    }
