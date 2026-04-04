@@ -24,11 +24,11 @@ Céal (pronounced "KAYL") is an AI-powered career signal engine built by Josh Hi
 - **Framework**: FastAPI (async), SQLAlchemy (async), Pydantic v2
 - **Database**: Polymorphic — SQLite (dev/test) + PostgreSQL (production via Cloud SQL)
 - **Deployment**: Docker + GCP Cloud Run
-- **Tests**: pytest with `asyncio_mode = "strict"`, 220+ passing
+- **Tests**: pytest with `asyncio_mode = "strict"`, 295 passing
 - **Lint**: ruff (`py310`, line-length 120)
 - **CI**: GitHub Actions (lint → unit → integration → coverage → docker-build → db-tests-postgres)
 
-## Current Architecture (post-Sprint 8)
+## Current Architecture (post-Sprint 10)
 
 ```
 ceal/
@@ -48,8 +48,19 @@ ceal/
 │   │   └── schema_postgres.sql  # PostgreSQL DDL (13 tables)
 │   ├── normalizer/
 │   │   └── pipeline.py          # HTML → clean text normalizer
+│   ├── document/
+│   │   ├── __init__.py           # Package exports
+│   │   ├── coverletter_engine.py # Claude API cover letter content
+│   │   ├── coverletter_pdf.py    # ReportLab cover letter PDF
+│   │   ├── design_system.py      # Brother Kit Rules design tokens
+│   │   ├── font_manager.py       # TTF font loading
+│   │   ├── models.py             # ResumeData, CoverLetterData, ExportResult
+│   │   ├── resume_pdf.py         # ReportLab resume PDF
+│   │   └── rich_text.py          # **bold** metric parsing for PDFs
 │   ├── ranker/
-│   │   └── llm_ranker.py        # Claude API scoring (0.0–1.0)
+│   │   ├── llm_ranker.py         # Claude API scoring (0.0–1.0)
+│   │   ├── regime_classifier.py  # Vertex AI tier classification (optional, fail-open)
+│   │   └── regime_models.py      # Regime classification Pydantic models
 │   ├── scrapers/
 │   │   ├── base.py              # Abstract scraper interface
 │   │   └── linkedin.py          # LinkedIn scraper implementation
@@ -68,6 +79,7 @@ ceal/
 │       │   ├── demo.py          # GET/POST /demo — tailoring demo
 │       │   ├── applications.py  # GET /applications — CRM Kanban + reminders
 │       │   ├── apply.py         # GET/POST /apply — approval queue + review
+│       │   ├── export.py        # GET/POST /export — PDF resume + cover letter
 │       │   └── health.py        # GET /health — DB probe
 │       ├── static/style.css
 │       └── templates/           # Jinja2 HTML templates
@@ -75,6 +87,7 @@ ceal/
 │   ├── unit/                    # 17 test files, mock-based
 │   └── integration/             # 4 round-trip / pipeline integration files
 ├── data/
+│   ├── fonts/                   # TTF fonts (Archivo, Inter, JetBrains Mono)
 │   ├── resume.txt               # Josh's resume (parser-compatible)
 │   └── sample_job.txt           # Test job listing
 ├── deploy/
@@ -104,7 +117,8 @@ ceal/
 | Sprint 2 (CRM) | ✅ Shipped | Applications route, Kanban board, job state machine, stale reminders |
 | Sprint 3 (Auto-Apply) | ✅ Shipped | Prefill engine, approval queue, review screen, confidence scoring |
 | Sprint 8 | ✅ Shipped | Reimplemented CRM + Auto-Apply on the recovered Sprint 6 baseline |
-| Sprint 9 | 📋 Planned | Vertex AI regime classification for prompt A/B testing |
+| Sprint 9 (Vertex AI) | ✅ Shipped | Optional fail-open regime classifier, tier strategy A/B scaffolding |
+| Sprint 10 (PDF Gen) | ✅ Shipped | ReportLab resume + cover letter PDFs, Claude cover letter engine, export routes |
 
 **Branch reset recovery note:** On April 2, 2026, `main` was reset to the `codex/semantic-fidelity-guardrail` branch to fix schema issues. That temporarily removed CRM and Auto-Apply from `main`. Sprint 6 reimplemented Docker + Cloud SQL on the recovered baseline, and Sprint 8 reimplemented CRM + Auto-Apply using the preserved reference copy at `C:\Users\joshb\Documents\GitHub\ceal\`.
 
@@ -117,6 +131,10 @@ ceal/
 **Phase 4 / CRM + Auto-Apply (2 tables)**: `applications`, `application_fields`
 
 Both `schema.sql` (SQLite) and `schema_postgres.sql` (PostgreSQL) contain all 13 tables with matching constraints.
+
+**Sprint 9 additions**: `job_listings` gained regime columns (`regime_confidence`, `regime_reasoning`, `regime_model_version`, `regime_classified_at`) for Vertex AI tier classification metadata.
+
+> See also: `docs/CEAL_PROJECT_LEDGER.md` for the full project timeline, and `docs/MASTER_PROMPT_ARCHITECTURE.md` for prompt system design rationale.
 
 ## Target Roles (Why This Exists)
 

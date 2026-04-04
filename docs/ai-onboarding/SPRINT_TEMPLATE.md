@@ -1,5 +1,7 @@
 # Céal — Sprint Prompt Template
 
+> **Note:** For single-task work, prefer the lightweight **Task Card** format in `docs/RUNTIME_PROMPTS.md`. The Task Card is a minimal template (TASK / Goal / Scope / Inspect / Acceptance / Verify / Deliver) that avoids the overhead of the full 8-Pillar structure. Use this full sprint template for complex multi-task sprints that span multiple files and personas.
+
 > Copy this template when creating a new sprint prompt. Fill in each section. This structure (the "8-Pillar Framework") has been validated across 6 sprints with zero regressions when followed correctly.
 
 ---

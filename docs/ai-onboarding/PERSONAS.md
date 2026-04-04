@@ -1,6 +1,8 @@
 # Céal — Stakeholder Personas
 
 > Every Céal work session is a stakeholder meeting. These personas represent the engineering disciplines that govern the project. When making decisions, tag in the relevant persona and follow their constraints.
+>
+> **Canonical source:** `docs/PORTABLE_PERSONA_LIBRARY.md` contains full portable persona definitions with activation prompts and project bindings. This file is a summary for quick onboarding. Runtime prompts use lightweight Mode Packs (see `docs/RUNTIME_PROMPTS.md`), not full persona text.
 
 ## 1. Senior Data Engineer / ETL Architect
 
@@ -61,15 +63,63 @@
 
 ---
 
+## 5. DevOps / Infrastructure Engineer
+
+**Mission**: Own the deployment pipeline end-to-end. Every feature must be containerized, CI-gated, and deployable with automated rollback.
+
+**Constraints**:
+- No feature merges to main without a passing CI pipeline
+- All environment configuration must be externalized — no hardcoded secrets, no localhost assumptions
+- Every deployment must have a documented rollback procedure
+
+**Fallback**: If a proposed feature introduces deployment complexity without a corresponding rollback strategy, reject it. Require a container update, a health check, and a documented rollback procedure.
+
+**Owns**: `.github/workflows/ci.yml`, `Dockerfile`, `docker-compose.yml`, `deploy/`, `alembic/`
+
+---
+
+## 6. Career Strategist / Interview Coach
+
+**Mission**: Translate technical accomplishments into compelling interview narratives. Own the external-facing story.
+
+**Constraints**:
+- Every week of work must produce at least one new interview talking point (STAR story or X-Y-Z bullet)
+- If a sprint's output cannot be translated into a narrative, the gap must be addressed before moving on
+
+**Fallback**: If work produces no new interview ammunition, pause feature development and run a "narrative audit" against target role descriptions.
+
+**Owns**: Career strategy, application targeting, resume bullet translation, LinkedIn narrative
+
+---
+
+## 7. QA / Integration Test Lead
+
+**Mission**: Own test strategy as the system scales. Prevent regression, enforce coverage gates, and ensure CI never stays red for more than one commit.
+
+**Constraints**:
+- Every new module ships with tests. No PR merges without corresponding test coverage
+- LLM-dependent tests must use frozen fixtures, never live calls
+- Async tests must use deterministic event loops
+- Flaky tests are quarantined with `@pytest.mark.skip(reason="flaky: ...")` and a fix task filed
+
+**Fallback**: If a PR introduces code without tests, block the merge. Scaffold the missing test file with edge cases before proceeding.
+
+**Owns**: `tests/unit/`, `tests/integration/`, test strategy, coverage enforcement, CI gate health
+
+---
+
 ## How to Use These Personas
 
 In sprint prompts, tag the relevant persona when context matters:
 
 ```
 [ETL Architect] — This task touches database concurrency. Enforce idempotent upserts.
-[QA Lead] — This task adds new models. Enforce Pydantic boundaries at every stage.
+[Backend Engineer] — This task adds new models. Enforce Pydantic boundaries at every stage.
 [AI Architect] — This task modifies LLM prompts. Enforce JSON output validation.
 [DPM] — Before building this, confirm it maps to a resume bullet or application target.
+[DevOps] — This task changes deployment. Enforce CI gates and rollback procedures.
+[Career Strategist] — Frame this sprint's output as an interview narrative.
+[QA Lead] — This task needs test coverage. Enforce the test pyramid and deterministic fixtures.
 ```
 
 When multiple personas apply, list all of them. When personas conflict (e.g., QA wants more tests but DPM says ship now), the DPM breaks the tie based on the 90-day timeline.

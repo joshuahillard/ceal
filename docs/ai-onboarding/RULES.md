@@ -1,6 +1,8 @@
 # Céal — Engineering Rules
 
 > These rules apply to ALL AI assistants working on Céal (Claude, Codex, Gemini). They exist because each one was learned the hard way.
+>
+> **See also:** The Core Contract in `docs/RUNTIME_PROMPTS.md` contains a compact runtime version of these rules for pasting into AI sessions. The two rule sets are complementary — this file has the full incident history and rationale; the Core Contract has the distilled paste-ready version.
 
 ## Non-Negotiable Rules
 
@@ -79,6 +81,20 @@ For any database function containing raw SQL, write a database-level test exerci
 ### The Branch Reset Data Loss
 **What happened**: Resetting `main` to a feature branch lost Sprints 2-5. Had to reimplement Docker + Cloud SQL from scratch.
 **Rule**: Never reset `main` to a feature branch. Use merge or cherry-pick instead. Tag before any destructive operation.
+
+## Rules Learned from Sprints 9-10
+
+### Vertex AI Fail-Open Pattern (Sprint 9)
+**Context**: The regime classifier is an optional enrichment step, not a core pipeline gate.
+**Rule**: External AI integrations for enrichment (non-core) must fail open — if Vertex AI is unreachable, the pipeline continues without classification. Log the failure, but do not block. Core features (Claude ranker, tailoring) may fail closed.
+
+### Schema Additive-Only for Enrichment Columns (Sprint 9)
+**Context**: Regime columns were added to `job_listings` as nullable columns.
+**Rule**: Enrichment columns added by optional features must be nullable with no default constraints. Existing queries must not break when enrichment columns are NULL.
+
+### PDF Generation Isolation (Sprint 10)
+**Context**: The `src/document/` module was added as a fully independent package.
+**Rule**: The document generation pipeline must not import from or modify the tailoring engine. They share data via Pydantic models only, never via direct function calls.
 
 ## Files That Must Not Be Modified Without Explicit Permission
 
