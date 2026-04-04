@@ -87,7 +87,7 @@ Claude Code doesn't need career context to implement a database migration. Owner
 2. Update relevant Mode Packs
 
 ### After adding a new LLM integration:
-1. Add to Prompt Registry (`docs/PROMPT_REGISTRY.md`)
+1. Add to Prompt Registry (`docs/prompts/PROMPT_REGISTRY.md`)
 2. Verify MODE: ml covers the new integration's failure modes
 
 ---
@@ -101,7 +101,7 @@ Claude Code doesn't need career context to implement a database migration. Owner
 | `CLAUDE_CODE_MASTER_PROMPT.md` | Claude Code config | Full instructions file for Claude Code sessions |
 | `PORTABLE_PERSONA_LIBRARY.md` | Human reference | Thinking frameworks for interview prep and mental models |
 | `CEAL_PROJECT_LEDGER.md` | Living record | Timeline, decisions, retrospectives |
-| `docs/PROMPT_REGISTRY.md` | Repo artifact | LLM prompt version tracking |
+| `PROMPT_REGISTRY.md` | Repo artifact | LLM prompt version tracking |
 
 ---
 

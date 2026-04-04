@@ -134,7 +134,7 @@ Both `schema.sql` (SQLite) and `schema_postgres.sql` (PostgreSQL) contain all 13
 
 **Sprint 9 additions**: `job_listings` gained regime columns (`regime_confidence`, `regime_reasoning`, `regime_model_version`, `regime_classified_at`) for Vertex AI tier classification metadata.
 
-> See also: `docs/CEAL_PROJECT_LEDGER.md` for the full project timeline, and `docs/MASTER_PROMPT_ARCHITECTURE.md` for prompt system design rationale.
+> See also: `docs/CEAL_PROJECT_LEDGER.md` for the full project timeline, and `docs/prompts/MASTER_PROMPT_ARCHITECTURE.md` for prompt system design rationale.
 
 ## Target Roles (Why This Exists)
 
