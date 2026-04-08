@@ -43,6 +43,10 @@ testpaths = ["tests"]
 pythonpath = ["."]
 asyncio_mode = "strict"
 addopts = "-v --tb=short"
+markers = [
+    "sqlite_only: test uses SQLite-specific introspection (sqlite_master, PRAGMA) — skipped on PostgreSQL",
+    "db_parity: test exercises operations that must produce identical results on SQLite and PostgreSQL",
+]
 
 # ---------------------------------------------------------------------------
 # Coverage

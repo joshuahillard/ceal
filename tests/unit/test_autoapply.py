@@ -34,6 +34,7 @@ async def client(app):
 
 class TestPhase4Schema:
     @pytest.mark.asyncio
+    @pytest.mark.sqlite_only
     async def test_applications_table_created(self):
         """Verify applications table exists after init_db."""
         import os
@@ -78,6 +79,7 @@ class TestPhase4Schema:
         await test_engine.dispose()
 
     @pytest.mark.asyncio
+    @pytest.mark.sqlite_only
     async def test_application_fields_table_created(self):
         """Verify application_fields table exists after init_db."""
         from sqlalchemy import text

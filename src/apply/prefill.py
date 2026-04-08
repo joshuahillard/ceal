@@ -54,7 +54,7 @@ class PreFillEngine:
     def _load_resume(self) -> str:
         """Load and cache resume text."""
         if self._resume_text is None:
-            with open(self._resume_path) as f:
+            with open(self._resume_path, encoding="utf-8") as f:
                 self._resume_text = f.read()
             self._parse_resume_fields()
         return self._resume_text

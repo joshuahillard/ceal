@@ -158,13 +158,16 @@ async def init_db(schema_path: str | None = None) -> None:
             for stmt in statements:
                 if stmt:
                     await session.execute(text(stmt))
-            await _ensure_resume_profile_exists(session, profile_id=1)
     else:
         # PostgreSQL: use engine.begin() for DDL outside session manager
         async with engine.begin() as conn:
             for stmt in statements:
                 if stmt:
                     await conn.execute(text(stmt))
+
+    # Keep startup behavior consistent across backends for auto-apply flows.
+    async with get_session() as session:
+        await _ensure_resume_profile_exists(session, profile_id=1)
 
     logger.info("database_initialized", schema=schema_path)
 
@@ -513,6 +516,8 @@ async def update_job_ranking(result: RankedResult) -> None:
     Apply the LLM ranker's output to a job listing.
     Updates score, reasoning, model version, and status in one statement.
     """
+    ranked_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
     async with get_session() as session:
         await session.execute(
             text("""
@@ -521,13 +526,14 @@ async def update_job_ranking(result: RankedResult) -> None:
                     match_reasoning = :reasoning,
                     rank_model_version = :model_version,
                     status = 'ranked',
-                    ranked_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+                    ranked_at = :ranked_at
                 WHERE id = :job_id
             """),
             {
                 "score": result.match_score,
                 "reasoning": result.match_reasoning,
                 "model_version": result.rank_model_version,
+                "ranked_at": ranked_at,
                 "job_id": result.job_id,
             },
         )
@@ -746,9 +752,10 @@ async def link_resume_skill(
 
         await session.execute(
             text("""
-                INSERT OR IGNORE INTO resume_skills
+                INSERT INTO resume_skills
                     (profile_id, skill_id, proficiency, years_experience, evidence)
                 VALUES (:pid, :sid, :prof, :years, :evidence)
+                ON CONFLICT (profile_id, skill_id) DO NOTHING
             """),
             {
                 "pid": profile_id,

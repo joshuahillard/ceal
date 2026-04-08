@@ -22,8 +22,8 @@ import pytest
 import pytest_asyncio
 from aioresponses import aioresponses
 
-# Override DB before imports
-os.environ["DATABASE_URL"] = "sqlite+aiosqlite://"
+# Default to SQLite if not already set (CI sets DATABASE_URL to PostgreSQL)
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite://")
 
 from src.main import run_pipeline
 from src.models.database import (

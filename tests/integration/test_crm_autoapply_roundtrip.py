@@ -1,12 +1,14 @@
 """
-Integration test: CRM + auto-apply round-trip using schema.sql only.
+Integration test: CRM + auto-apply round-trip.
 
-Exercises the real SQLite schema and raw SQL query path for:
+Exercises the real schema and raw SQL query path for:
     - CRM state transitions
     - application draft persistence
     - application field persistence
     - approval sync back to CRM
     - stale reminder queries
+
+Backend-aware: runs against SQLite locally, PostgreSQL in CI.
 """
 from __future__ import annotations
 
@@ -16,7 +18,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import text
 
-os.environ["DATABASE_URL"] = "sqlite+aiosqlite://"
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite://")
 
 from src.models.database import (  # noqa: E402
     create_application,
@@ -38,31 +40,23 @@ from src.models.entities import (  # noqa: E402
     RankedResult,
     RemoteType,
 )
-
-
-def _drop_all_tables(sync_conn):
-    """Drop all tables for clean test isolation."""
-    from sqlalchemy import inspect
-    from sqlalchemy import text as sa_text
-
-    sync_conn.execute(sa_text("PRAGMA foreign_keys=OFF"))
-    inspector = inspect(sync_conn)
-    for table in inspector.get_table_names():
-        sync_conn.execute(sa_text(f"DROP TABLE IF EXISTS [{table}]"))  # noqa: S608
-    sync_conn.execute(sa_text("PRAGMA foreign_keys=ON"))
+from tests.integration.conftest import drop_all_tables  # noqa: E402
 
 
 @pytest_asyncio.fixture(autouse=True)
 async def setup_schema_sql_only():
-    """Initialize a fresh in-memory database using schema.sql only."""
+    """Initialize a fresh database using the appropriate schema."""
     async with engine.begin() as conn:
-        await conn.run_sync(_drop_all_tables)
+        await conn.run_sync(drop_all_tables)
 
     await init_db()
 
     async with get_session() as session:
         await session.execute(
-            text("INSERT OR IGNORE INTO resume_profiles (id, name, version) VALUES (1, 'Josh Hillard', '1.0')")
+            text(
+                "INSERT INTO resume_profiles (id, name, version) VALUES (1, 'Josh Hillard', '1.0') "
+                "ON CONFLICT DO NOTHING"
+            )
         )
 
     yield
@@ -97,8 +91,9 @@ async def _create_ranked_job(external_id: str, company: str = "Stripe") -> int:
 
 class TestCrmAutoApplyRoundTrip:
     @pytest.mark.asyncio
+    @pytest.mark.sqlite_only
     async def test_tables_exist_after_init_db(self):
-        """applications and application_fields should exist after schema init."""
+        """applications and application_fields should exist after schema init (SQLite introspection)."""
         async with get_session() as session:
             result = await session.execute(
                 text("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")

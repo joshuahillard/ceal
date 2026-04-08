@@ -1,15 +1,17 @@
 """
-Integration test: Persistence round-trip using schema.sql only.
+Integration test: Persistence round-trip using schema only.
 
-Unlike test_persistence.py (which supplements schema.sql with ORM
+Unlike test_persistence.py (which supplements schema with ORM
 Base.metadata.create_all), this test proves the raw SQL path works
 end-to-end — the same path used by the main application.
 
 Exercises:
-    - init_db() creates all Phase 1 + Phase 2 tables from schema.sql
-    - save_tailoring_result() ON CONFLICT upsert works on real SQLite
+    - init_db() creates all Phase 1 + Phase 2 tables from schema
+    - save_tailoring_result() ON CONFLICT upsert works on real DB
     - get_tailoring_results() reconstructs from real rows
     - Idempotent save (upsert) updates without duplicating
+
+Backend-aware: runs against SQLite locally, PostgreSQL in CI.
 """
 from __future__ import annotations
 
@@ -18,8 +20,8 @@ import os
 import pytest
 import pytest_asyncio
 
-# Override DATABASE_URL BEFORE importing database module
-os.environ["DATABASE_URL"] = "sqlite+aiosqlite://"
+# Default to SQLite if not already set (CI sets DATABASE_URL to PostgreSQL)
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite://")
 
 from sqlalchemy import text
 
@@ -35,45 +37,35 @@ from src.tailoring.persistence import (
     get_tailoring_results,
     save_tailoring_result,
 )
-
-
-def _drop_all_tables(sync_conn):
-    """Drop all tables for clean test isolation."""
-    from sqlalchemy import inspect
-    from sqlalchemy import text as sa_text
-
-    sync_conn.execute(sa_text("PRAGMA foreign_keys=OFF"))
-    inspector = inspect(sync_conn)
-    for table in inspector.get_table_names():
-        sync_conn.execute(sa_text(f"DROP TABLE IF EXISTS [{table}]"))  # noqa: S608
-    sync_conn.execute(sa_text("PRAGMA foreign_keys=ON"))
+from tests.integration.conftest import drop_all_tables
 
 
 @pytest_asyncio.fixture(autouse=True)
 async def setup_schema_sql_only():
     """
-    Initialize database using ONLY schema.sql — no ORM create_all.
+    Initialize database using ONLY schema — no ORM create_all.
 
     This is the critical difference from test_persistence.py:
-    if schema.sql is missing Phase 2 tables, these tests fail.
+    if the schema is missing Phase 2 tables, these tests fail.
     """
     async with engine.begin() as conn:
-        await conn.run_sync(_drop_all_tables)
+        await conn.run_sync(drop_all_tables)
 
-    # Schema.sql only — no Base.metadata.create_all
     await init_db()
 
-    # Seed FK targets
+    # Seed FK targets — portable ON CONFLICT DO NOTHING
     async with get_session() as session:
         await session.execute(text(
-            "INSERT OR IGNORE INTO resume_profiles (id, name, version) "
-            "VALUES (1, 'Test Profile', '1.0')"
+            "INSERT INTO resume_profiles (id, name, version) "
+            "VALUES (1, 'Test Profile', '1.0') "
+            "ON CONFLICT DO NOTHING"
         ))
         await session.execute(text(
-            "INSERT OR IGNORE INTO job_listings "
+            "INSERT INTO job_listings "
             "(id, external_id, source, title, company_name, url, status) "
             "VALUES (1, 'integ-001', 'manual', 'SE at Acme', 'Acme Corp', "
-            "'https://example.com/1', 'ranked')"
+            "'https://example.com/1', 'ranked') "
+            "ON CONFLICT DO NOTHING"
         ))
     yield
     await engine.dispose()
@@ -134,8 +126,9 @@ class TestSchemaOnlyRoundTrip:
     """Prove the schema.sql-only path works for persistence."""
 
     @pytest.mark.asyncio
+    @pytest.mark.sqlite_only
     async def test_phase2_tables_exist_from_schema_sql(self):
-        """Verify Phase 2 tables were created by init_db (schema.sql), not ORM."""
+        """Verify Phase 2 tables were created by init_db (schema.sql), not ORM. SQLite introspection."""
         async with get_session() as session:
             result = await session.execute(text(
                 "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"

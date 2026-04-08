@@ -1,13 +1,15 @@
 """
-Integration test: Regime classification round-trip using schema.sql only.
+Integration test: Regime classification round-trip.
 
 Exercises:
-    - init_db() creates all tables including new regime columns from schema.sql
+    - init_db() creates all tables including new regime columns from schema
     - save_regime_classification() writes regime data to job_listings
     - get_jobs_missing_regime() returns only unclassified ranked jobs
     - get_regime_stats() returns correct tier counts
     - Reclassification overwrites cleanly (idempotent)
     - Regime columns are nullable (backward compatible)
+
+Backend-aware: runs against SQLite locally, PostgreSQL in CI.
 """
 from __future__ import annotations
 
@@ -16,8 +18,8 @@ import os
 import pytest
 import pytest_asyncio
 
-# Override DATABASE_URL BEFORE importing database module
-os.environ["DATABASE_URL"] = "sqlite+aiosqlite://"
+# Default to SQLite if not already set (CI sets DATABASE_URL to PostgreSQL)
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite://")
 
 from sqlalchemy import text
 
@@ -29,54 +31,47 @@ from src.models.database import (
     init_db,
     save_regime_classification,
 )
-
-
-def _drop_all_tables(sync_conn):
-    """Drop all tables for clean test isolation."""
-    from sqlalchemy import inspect
-    from sqlalchemy import text as sa_text
-
-    sync_conn.execute(sa_text("PRAGMA foreign_keys=OFF"))
-    inspector = inspect(sync_conn)
-    for table in inspector.get_table_names():
-        sync_conn.execute(sa_text(f"DROP TABLE IF EXISTS [{table}]"))  # noqa: S608
-    sync_conn.execute(sa_text("PRAGMA foreign_keys=ON"))
+from tests.integration.conftest import drop_all_tables
 
 
 @pytest_asyncio.fixture(autouse=True)
 async def setup_schema():
-    """Initialize database using ONLY schema.sql — no ORM create_all."""
+    """Initialize database using ONLY schema — no ORM create_all."""
     async with engine.begin() as conn:
-        await conn.run_sync(_drop_all_tables)
+        await conn.run_sync(drop_all_tables)
 
     await init_db()
 
-    # Seed required FK targets and test data
+    # Seed required FK targets and test data — portable ON CONFLICT DO NOTHING
     async with get_session() as session:
         await session.execute(text(
-            "INSERT OR IGNORE INTO resume_profiles (id, name, version) "
-            "VALUES (1, 'Test Profile', '1.0')"
+            "INSERT INTO resume_profiles (id, name, version) "
+            "VALUES (1, 'Test Profile', '1.0') "
+            "ON CONFLICT DO NOTHING"
         ))
         # Job 1: ranked (has match_score), no regime classification
         await session.execute(text(
-            "INSERT OR IGNORE INTO job_listings "
+            "INSERT INTO job_listings "
             "(id, external_id, source, title, company_name, url, status, match_score, description_clean) "
             "VALUES (1, 'regime-001', 'manual', 'TSE at Stripe', 'Stripe', "
-            "'https://example.com/1', 'ranked', 0.87, 'Technical Solutions Engineer role')"
+            "'https://example.com/1', 'ranked', 0.87, 'Technical Solutions Engineer role') "
+            "ON CONFLICT DO NOTHING"
         ))
         # Job 2: ranked, no regime classification
         await session.execute(text(
-            "INSERT OR IGNORE INTO job_listings "
+            "INSERT INTO job_listings "
             "(id, external_id, source, title, company_name, url, status, match_score, description_clean) "
             "VALUES (2, 'regime-002', 'manual', 'Cloud Engineer at MongoDB', 'MongoDB', "
-            "'https://example.com/2', 'ranked', 0.65, 'Cloud infrastructure role')"
+            "'https://example.com/2', 'ranked', 0.65, 'Cloud infrastructure role') "
+            "ON CONFLICT DO NOTHING"
         ))
         # Job 3: scraped but NOT ranked (no match_score) — should not appear
         await session.execute(text(
-            "INSERT OR IGNORE INTO job_listings "
+            "INSERT INTO job_listings "
             "(id, external_id, source, title, company_name, url, status) "
             "VALUES (3, 'regime-003', 'manual', 'Unranked Job', 'Acme Corp', "
-            "'https://example.com/3', 'scraped')"
+            "'https://example.com/3', 'scraped') "
+            "ON CONFLICT DO NOTHING"
         ))
 
     yield
@@ -87,8 +82,9 @@ class TestRegimeColumns:
     """Verify schema changes."""
 
     @pytest.mark.asyncio
+    @pytest.mark.sqlite_only
     async def test_regime_columns_exist(self):
-        """Schema creates all 5 regime columns on job_listings."""
+        """Schema creates all 5 regime columns on job_listings (SQLite PRAGMA introspection)."""
         async with get_session() as session:
             result = await session.execute(text("PRAGMA table_info(job_listings)"))
             cols = [row[1] for row in result]
@@ -125,8 +121,9 @@ class TestRegimeColumns:
             assert row[2] is None  # regime_reasoning
 
     @pytest.mark.asyncio
+    @pytest.mark.sqlite_only
     async def test_recommended_tier_index_exists(self):
-        """Index on recommended_tier was created."""
+        """Index on recommended_tier was created (SQLite introspection)."""
         async with get_session() as session:
             result = await session.execute(text(
                 "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_job_listings_recommended_tier'"
