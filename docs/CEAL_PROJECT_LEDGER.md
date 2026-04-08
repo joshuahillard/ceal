@@ -238,7 +238,7 @@ On April 2, `main` was reset to `codex/semantic-fidelity-guardrail`, which lost 
 | TD-001 | Mock-only route tests hide SQL bugs. Core query functions need DB-level integration tests. | High | Sprint 1 | Open |
 | TD-002 | LLM keyword-stuffs job requirements into resume bullets regardless of candidate's actual skills. Tier prompts need a "only reference skills the candidate has" constraint. | Medium | Sprint 1 | Open |
 | TD-003 | Existing `ceal.db` won't have Sprint 9 regime columns (CREATE TABLE IF NOT EXISTS doesn't ALTER). Need Alembic migration or manual ALTER TABLE. | Medium | Sprint 9 | Open |
-| TD-004 | No prompt registry — `RANKER_VERSION` tracks version but no document maps version to actual prompt text. | Medium | Phase 1 | Open |
+| TD-004 | No prompt registry — `RANKER_VERSION` tracks version but no document maps version to actual prompt text. | Medium | Phase 1 | Resolved (PROMPT_REGISTRY.md created April 3) |
 | TD-005 | Two schema files (`schema.sql` + `schema_postgres.sql`) must be kept in sync manually. | Low | Sprint 6 | Open |
 
 ---

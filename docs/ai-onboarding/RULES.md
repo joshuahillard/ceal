@@ -2,7 +2,7 @@
 
 > These rules apply to ALL AI assistants working on Céal (Claude, Codex, Gemini). They exist because each one was learned the hard way.
 >
-> **See also:** The Core Contract in `docs/RUNTIME_PROMPTS.md` contains a compact runtime version of these rules for pasting into AI sessions. The two rule sets are complementary — this file has the full incident history and rationale; the Core Contract has the distilled paste-ready version.
+> **See also:** The Core Contract in `docs/prompts/RUNTIME_PROMPTS.md` contains a compact runtime version of these rules for pasting into AI sessions. The two rule sets are complementary — this file has the full incident history and rationale; the Core Contract has the distilled paste-ready version.
 
 ## Non-Negotiable Rules
 

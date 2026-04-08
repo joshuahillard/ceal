@@ -86,6 +86,8 @@ MODE: db
 - Use WAL mode for SQLite. Connection pooling for PostgreSQL.
 - Migrations via Alembic. Test migration up and down.
 - Verify with targeted DB integration tests, not just mocked returns.
+- Never await sync methods (e.g., result.scalar() is sync). Match await to actual coroutines.
+- PostgreSQL gotchas: ROUND() requires CAST(x AS numeric), CREATE TRIGGER must not be split across statements in schema loaders.
 ```
 
 ### MODE: ml

@@ -22,6 +22,7 @@ Rules:
 8. Ask one brief question only if ambiguity creates material risk.
 9. Do not fabricate file paths, function names, or test results.
 10. Do not modify schema.sql without also updating schema_postgres.sql.
+11. At session start, verify context: run `pwd` and `git remote -v` to confirm the correct repo. If wrong, stop and ask before proceeding.
 
 Key paths:
 - Pipeline: src/pipeline.py, src/scraper/, src/normalizer.py, src/ranker/
@@ -29,13 +30,13 @@ Key paths:
 - Web: src/web/ (app.py, routes/, templates/)
 - DB: src/models/ (database.py, schema.sql, schema_postgres.sql, compat.py)
 - Tests: tests/unit/, tests/integration/
-- Docs: docs/ai-onboarding/
+- Docs: docs/prompts/, docs/ai-onboarding/
 
 Full project context: docs/ai-onboarding/PROJECT_CONTEXT.md (read before first task).
 
 ## Mode Packs (activate per task)
 
-**MODE: db** — ON CONFLICT upserts, dual schema files, WAL mode, Alembic migrations, test with real DB not mocks.
+**MODE: db** — ON CONFLICT upserts, dual schema files, WAL mode, Alembic migrations, test with real DB not mocks. Never await sync methods (e.g., result.scalar() is sync). PostgreSQL gotchas: ROUND() requires CAST(x AS numeric), CREATE TRIGGER must not be split across statements in schema loaders.
 
 **MODE: ml** — Version prompt changes, strip code fences, validate scores 0.0-1.0, verify booleans structurally, frozen fixtures, enrichment fails open / core fails closed.
 
@@ -45,7 +46,7 @@ Full project context: docs/ai-onboarding/PROJECT_CONTEXT.md (read before first t
 
 **MODE: infra** — Docker < 3 min build, CI before merge, config via env vars, rollback documented, update .env.example.
 
-Full mode pack text: docs/RUNTIME_PROMPTS.md
+Full mode pack text: docs/prompts/RUNTIME_PROMPTS.md
 
 ## Task Format
 
@@ -73,7 +74,7 @@ At session end, produce:
 |-----|----------|
 | Project Context | docs/ai-onboarding/PROJECT_CONTEXT.md |
 | Project Ledger | docs/CEAL_PROJECT_LEDGER.md |
-| Runtime Prompts | docs/RUNTIME_PROMPTS.md |
-| Prompt Architecture | docs/MASTER_PROMPT_ARCHITECTURE.md |
-| Persona Library | docs/PORTABLE_PERSONA_LIBRARY.md |
+| Runtime Prompts | docs/prompts/RUNTIME_PROMPTS.md |
+| Prompt Architecture | docs/prompts/MASTER_PROMPT_ARCHITECTURE.md |
+| Persona Library | docs/prompts/PORTABLE_PERSONA_LIBRARY.md |
 | Anti-Hallucination Rules | docs/ai-onboarding/RULES.md |
