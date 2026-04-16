@@ -44,3 +44,6 @@ push_to_github.sh
 CLAUDE_CODE_*.md
 !docs/CLAUDE_CODE_MASTER_PROMPT.md
 !docs/templates/CLAUDE_CODE_MASTER_PROMPT_TEMPLATE.md
+
+# WSL/FUSE filesystem ghosts (Cowork sandbox leaves these when files are deleted with open handles)
+data/.fuse_hidden*
