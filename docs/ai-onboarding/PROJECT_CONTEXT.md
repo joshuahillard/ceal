@@ -93,8 +93,12 @@ ceal/
 ├── deploy/
 │   └── cloudrun.sh              # GCP Cloud Run deployment
 ├── docs/
-│   ├── ai-onboarding/           # ← YOU ARE HERE
-│   └── session_notes/           # Sprint session logs
+│   ├── ai-onboarding/           # ← YOU ARE HERE (PROJECT_CONTEXT, RULES)
+│   ├── historical/              # Archived PDFs/DOCX (Master Handoff, Project Charter, Phase 1 Handoff)
+│   ├── prompts/                 # PROMPT_REGISTRY, RUNTIME_PROMPTS, MASTER_PROMPT_ARCHITECTURE
+│   ├── reference/               # COWORK_PROJECT_INSTRUCTIONS, Plain_Language_Synthesis, SETUP_INSTRUCTIONS
+│   ├── session_notes/           # Sprint session logs
+│   └── strategy/                # Trust model, governance, program mgmt, design docs (see strategy/README.md)
 ├── alembic/                     # Database migrations
 ├── Dockerfile                   # Multi-stage build
 ├── docker-compose.yml           # PostgreSQL 16 + web
