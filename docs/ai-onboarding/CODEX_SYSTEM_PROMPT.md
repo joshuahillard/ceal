@@ -101,4 +101,4 @@ After completing ANY work session (sprint, bug fix, code review, consultation), 
 
 ### Sprint Prompts
 
-Sprint prompts live in `docs/ai-onboarding/sprints/` or are provided directly. They follow the 8-Pillar Framework documented in `SPRINT_TEMPLATE.md`.
+Sprint prompts live in `docs/sprints/` when they are tracked in repo. Use the existing sprint docs there as the canonical in-repo examples.

@@ -84,8 +84,8 @@ ceal/
 │       ├── static/style.css
 │       └── templates/           # Jinja2 HTML templates
 ├── tests/
-│   ├── unit/                    # 17 test files, mock-based
-│   └── integration/             # 4 round-trip / pipeline integration files
+│   ├── unit/                    # 23 test files, mock-heavy plus edge-case coverage
+│   └── integration/             # 6 round-trip / backend parity integration files
 ├── data/
 │   ├── fonts/                   # TTF fonts (Archivo, Inter, JetBrains Mono)
 │   ├── resume.txt               # Josh's resume (parser-compatible)
@@ -98,6 +98,7 @@ ceal/
 │   ├── prompts/                 # PROMPT_REGISTRY, RUNTIME_PROMPTS, MASTER_PROMPT_ARCHITECTURE
 │   ├── reference/               # COWORK_PROJECT_INSTRUCTIONS, Plain_Language_Synthesis, SETUP_INSTRUCTIONS
 │   ├── session_notes/           # Sprint session logs
+│   ├── sprints/                 # Canonical in-repo sprint execution prompts
 │   └── strategy/                # Trust model, governance, program mgmt, design docs (see strategy/README.md)
 ├── alembic/                     # Database migrations
 ├── Dockerfile                   # Multi-stage build
@@ -167,6 +168,7 @@ Both `schema.sql` (SQLite) and `schema_postgres.sql` (PostgreSQL) contain all 13
 | Prompt version registry | `docs/prompts/PROMPT_REGISTRY.md` |
 | Project ledger (ADRs, retrospectives) | `docs/CEAL_PROJECT_LEDGER.md` |
 | Engineering rules | `docs/ai-onboarding/RULES.md` |
+| Sprint execution prompts | `docs/sprints/` |
 
 ## Target Roles (Why This Exists)
 

@@ -163,6 +163,28 @@ On April 2, `main` was reset to `codex/semantic-fidelity-guardrail`, which lost 
 
 ---
 
+#### Thursday, April 16 — Sprint 11 Hardening + Twin-Docs Reconciliation
+
+**Session duration:** Multi-session continuation
+**Personas active:** QA Lead, Backend Engineer, AI Architect, Technical Program Manager
+
+**What shipped:**
+- **Sprint 11 hardening:** Prefill engine edge-case coverage for empty, whitespace, unicode, and malformed resume inputs
+- **DB parity:** SQLite/PostgreSQL round-trip harness validating backend-aware behavior instead of relying on route-layer mocks
+- **Canonical docs reconciliation:** Re-merged active onboarding, prompt, reference, and strategy docs into `ceal/docs/`
+- **Claude Code fast-path fix:** Corrected stale source paths, prompt locations, and repo-state counts in the active AI entrypoints
+
+**Commits:** `e5fa565` (prefill hardening + DB parity), `fe607aa` (historical/reference rescue), `29b12b2` (RULES merge), `5697e43` (PROMPT_REGISTRY merge), `bfdb481` (PROJECT_CONTEXT correction), `509b722` (master prompt key-doc fix)
+**Test count:** 246 -> 317
+**Effort:** High. Hardening and docs reconciliation both required source-verifying the canonical docs against the live repo tree.
+
+**Retrospective:**
+- *What went well:* The DB parity harness closed the mock blind spot quickly. Re-centering onboarding inside `ceal/docs/` restored a single canonical source of truth for AI sessions.
+- *What went wrong:* Parallel top-level and in-repo doc trees drifted. Claude Code, Codex, and Gemini entrypoints pointed at deleted paths and stale counts, which forced repeated re-verification and slowed every session.
+- *Lesson:* AI entrypoints are operational infrastructure. When code paths or canonical doc locations move, `CLAUDE.md`, runtime prompts, onboarding docs, and the ledger must be updated in the same change window.
+
+---
+
 ## Decision Log
 
 ### ADR-001: Pydantic v2 at Every Pipeline Boundary (March 28)
@@ -217,12 +239,12 @@ On April 2, `main` was reset to `codex/semantic-fidelity-guardrail`, which lost 
 
 ## Cumulative Metrics
 
-| Metric | Phase 0 | Phase 1 | Sprint Week End |
-|--------|---------|---------|-----------------|
-| **Tests passing** | 0 | 93 | 246 |
+| Metric | Phase 0 | Phase 1 | Current |
+|--------|---------|---------|---------|
+| **Tests passing** | 0 | 93 | 317 |
 | **Source files** | 1 | ~15 | 60+ |
 | **Database tables** | 1 | 7 | 13 |
-| **Git commits** | 1 | 8 | 30+ |
+| **Git commits** | 1 | 8 | 49 |
 | **Release tags** | 0 | 0 | 4 |
 | **CI jobs** | 0 | 0 | 6 |
 | **Lines of code** | ~50 | ~1,500 | ~5,000+ |
@@ -254,7 +276,10 @@ On April 2, `main` was reset to `codex/semantic-fidelity-guardrail`, which lost 
 **Sprint Week (Infrastructure + Scale):**
 > Delivered 10 engineering sprints in 7 days — from CLI prototype to production-ready web application with Docker containerization, Cloud SQL, Vertex AI classification, PDF generation, CRM, and auto-apply — scaling from 93 to 246 automated tests with zero regressions, by developing an 8-pillar anti-hallucination prompt framework enabling deterministic multi-AI development across Claude, Codex, and Gemini.
 
+**Sprint 11 (Hardening + Reconciliation):**
+> Hardened Ceal for dual-backend reliability and restored canonical AI onboarding as measured by 317 passing tests and zero lint failures, by adding SQLite/PostgreSQL parity coverage, prefill edge-case tests, and a source-verified Claude Code documentation reconciliation pass.
+
 ---
 
 *Ledger maintained by: Technical Program Manager persona*
-*Last updated: April 3, 2026*
+*Last updated: April 16, 2026*

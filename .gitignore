@@ -40,7 +40,7 @@ desktop.ini
 # Local utility scripts
 push_to_github.sh
 
-# Temporary sprint prompts (canonical versions live in docs/ai-onboarding/sprints/)
+# Temporary top-level sprint prompt dumps (canonical tracked prompts live in docs/sprints/)
 CLAUDE_CODE_*.md
 !docs/CLAUDE_CODE_MASTER_PROMPT.md
 !docs/templates/CLAUDE_CODE_MASTER_PROMPT_TEMPLATE.md

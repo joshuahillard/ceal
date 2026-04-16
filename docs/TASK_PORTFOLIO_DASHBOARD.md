@@ -103,7 +103,7 @@ TAB 1: OVERVIEW
 - Infrastructure comparison (2-column: Ceal infra vs Moss Lane infra)
 
 TAB 2: CEAL ENGINE
-- KPI grid: src files, src lines, test files, test lines, tests passing (246), DB tables, web routes, release tags, ADRs, doc files
+- KPI grid: src files, src lines, test files, test lines, tests passing (317), DB tables, web routes, release tags, ADRs, doc files
 - Architecture flow diagram (core pipeline + extended modules — use CSS flexbox boxes with arrows)
 - Source lines by module (horizontal bar: models, tailoring, document, web, scrapers, ranker, normalizer, apply)
 - Largest source files (horizontal bar: database.py, main.py, etc.)
@@ -215,8 +215,8 @@ Deliver:
 
 ```
 SNAPSHOT:
-- Branch: main | Tag: v2.10.0-sprint10-pdf-generation
-- Tests: 246 passing, 0 warnings, ruff clean
+- Branch: main | Latest release tag: v2.10.0-sprint10-pdf-generation
+- Tests: 317 passing, 0 warnings, ruff clean
 - Known issues: TD-001 through TD-005 (see ledger)
 - DB state: 37 job_listings, 38 skills, 11 company_tiers, 1 resume_profile
 - Recent context: Sprint 10 shipped April 3 2026. PDF gen + CRM + Vertex AI live.

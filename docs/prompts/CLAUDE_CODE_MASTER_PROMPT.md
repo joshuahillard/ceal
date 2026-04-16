@@ -1,6 +1,6 @@
 # Claude Code Master Prompt — Ceal Project
 **Paste as Claude Code custom instructions or CLAUDE.md**
-*Version: 1.1 | April 3, 2026*
+*Version: 1.1 | April 3, 2026 | Reconciled: April 16, 2026*
 
 ---
 
@@ -25,12 +25,12 @@ Rules:
 11. At session start, verify context: run `pwd` and `git remote -v` to confirm the correct repo. If wrong, stop and ask before proceeding.
 
 Key paths:
-- Pipeline: src/pipeline.py, src/scraper/, src/normalizer.py, src/ranker/
+- Pipeline: src/main.py, src/scrapers/, src/normalizer/pipeline.py, src/ranker/
 - Tailoring: src/tailoring/ (models, parser, extractor, engine)
 - Web: src/web/ (app.py, routes/, templates/)
 - DB: src/models/ (database.py, schema.sql, schema_postgres.sql, compat.py)
 - Tests: tests/unit/, tests/integration/
-- Docs: docs/prompts/, docs/ai-onboarding/
+- Docs: docs/prompts/, docs/ai-onboarding/, docs/sprints/
 
 Full project context: docs/ai-onboarding/PROJECT_CONTEXT.md (read before first task).
 
@@ -78,4 +78,5 @@ At session end, produce:
 | Prompt Architecture | docs/prompts/MASTER_PROMPT_ARCHITECTURE.md |
 | Persona Library | docs/prompts/PORTABLE_PERSONA_LIBRARY.md |
 | Anti-Hallucination Rules | docs/ai-onboarding/RULES.md |
+| Sprint Prompts | docs/sprints/ |
 | Prompt Registry | docs/prompts/PROMPT_REGISTRY.md |

@@ -53,7 +53,7 @@ This is how you give Claude Code work to do, going forward.
 Keep this file open in a tab while you work:
 
 ```
-C:\Users\joshb\Documents\GitHub\ceal\docs\RUNTIME_PROMPTS.md
+docs/prompts/RUNTIME_PROMPTS.md
 ```
 
 This has the Task Card template, all five Mode Packs, the Snapshot block, and worked examples.
@@ -100,8 +100,8 @@ Most tasks don't need this. Only add it when the task depends on knowing the cur
 
 ```
 SNAPSHOT:
-- Branch: main | Tag: v2.10.0-sprint10-pdf-generation
-- Tests: 246 passing, 0 warnings, ruff clean
+- Branch: main | Latest release tag: v2.10.0-sprint10-pdf-generation
+- Tests: 317 passing, 0 warnings, ruff clean
 - Known issues: TD-003 — existing DBs missing regime columns
 ```
 

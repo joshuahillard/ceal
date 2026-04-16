@@ -1,6 +1,6 @@
 # Ceal Runtime Prompts
 **Copy-paste blocks for AI sessions. Nothing in this file is for humans to read — it's all model input.**
-*Version: 1.1 | April 3, 2026*
+*Version: 1.1 | April 3, 2026 | Reconciled: April 16, 2026*
 
 ---
 
@@ -29,14 +29,17 @@ Rules:
 - PowerShell 5 compatible ($env: syntax, no BOM encoding).
 - Run targeted verification and report what actually passed.
 - Ask one brief question only if ambiguity creates material risk.
+- Do not fabricate file paths, function names, or test results.
+- Keep `schema.sql` and `schema_postgres.sql` in sync.
+- Verify context at session start with `pwd` and `git remote -v`.
 
 Key paths:
-- Pipeline: src/pipeline.py, src/scraper/, src/normalizer.py, src/ranker/
+- Pipeline: src/main.py, src/scrapers/, src/normalizer/pipeline.py, src/ranker/
 - Tailoring: src/tailoring/ (models, parser, extractor, engine)
 - Web: src/web/ (app.py, routes/, templates/)
 - DB: src/models/ (database.py, schema.sql, schema_postgres.sql, compat.py)
 - Tests: tests/unit/, tests/integration/
-- Docs: docs/ai-onboarding/
+- Docs: docs/prompts/, docs/ai-onboarding/, docs/sprints/
 ```
 
 ---
@@ -139,8 +142,8 @@ Attach only when the task depends on volatile repo state.
 
 ```
 SNAPSHOT:
-- Branch: main | Tag: v2.10.0-sprint10-pdf-generation
-- Tests: 246 passing, 0 warnings, ruff clean
+- Branch: main | Latest release tag: v2.10.0-sprint10-pdf-generation
+- Tests: 317 passing, 0 warnings, ruff clean
 - Known issues: [list any relevant failing tests, open bugs, or blockers]
 - Recent context: [1-2 sentences if prior work in this session matters]
 ```
@@ -240,8 +243,8 @@ Out of scope: Web routes, tailoring engine, CLI flags.
 [...task card...]
 
 SNAPSHOT:
-- Branch: main | Tag: v2.10.0-sprint10-pdf-generation
-- Tests: 246 passing
+- Branch: main | Latest release tag: v2.10.0-sprint10-pdf-generation
+- Tests: 317 passing
 - Known issues: CREATE TABLE IF NOT EXISTS doesn't ALTER for new columns (TD-003)
 
 Implement Part A only: Alembic config + initial migration. Stop after committing.
