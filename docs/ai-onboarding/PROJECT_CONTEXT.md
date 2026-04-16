@@ -24,7 +24,7 @@ Céal (pronounced "KAYL") is an AI-powered career signal engine built by Josh Hi
 - **Framework**: FastAPI (async), SQLAlchemy (async), Pydantic v2
 - **Database**: Polymorphic — SQLite (dev/test) + PostgreSQL (production via Cloud SQL)
 - **Deployment**: Docker + GCP Cloud Run
-- **Tests**: pytest with `asyncio_mode = "strict"`, 317 passing (verified 2026-04-16 via pytest)
+- **Tests**: pytest with `asyncio_mode = "strict"`, 317 passing locally under the default SQLite test run (verified 2026-04-16 via pytest); PostgreSQL CI is currently red on schema-loader multi-statement init
 - **Lint**: ruff (`py310`, line-length 120)
 - **CI**: GitHub Actions (lint → unit → integration → coverage → docker-build → db-tests-postgres)
 
@@ -124,7 +124,7 @@ ceal/
 | Sprint 8 | ✅ Shipped | Reimplemented CRM + Auto-Apply on the recovered Sprint 6 baseline |
 | Sprint 9 (Vertex AI) | ✅ Shipped | Optional fail-open regime classifier, tier strategy A/B scaffolding |
 | Sprint 10 (PDF Gen) | ✅ Shipped | ReportLab resume + cover letter PDFs, Claude cover letter engine, export routes |
-| Sprint 11 (Hardening + Docs) | ✅ Shipped | Prefill edge-case hardening, backend-aware DB parity harness (+71 tests), twin-docs reconciliation into canonical `docs/` tree |
+| Sprint 11 (Hardening + Docs) | ✅ Shipped | Prefill edge-case hardening, SQLite-first DB parity harness (+71 local tests), twin-docs reconciliation into canonical `docs/` tree; PostgreSQL CI fix still pending |
 
 **Branch reset recovery note:** On April 2, 2026, `main` was reset to the `codex/semantic-fidelity-guardrail` branch to fix schema issues. That temporarily removed CRM and Auto-Apply from `main`. Sprint 6 reimplemented Docker + Cloud SQL on the recovered baseline, and Sprint 8 reimplemented CRM + Auto-Apply using the preserved reference copy at `C:\Users\joshb\Documents\GitHub\ceal\`.
 
@@ -154,9 +154,9 @@ Both `schema.sql` (SQLite) and `schema_postgres.sql` (PostgreSQL) contain all 13
 | Sprint 8 | CRM (Kanban + state machine) + Auto-Apply (prefill, approval queue) | 202 |
 | Sprint 9 | Vertex AI regime classification (fail-open, A/B instrumented) | 220 |
 | Sprint 10 | PDF generation (ReportLab resume + cover letter), Claude cover letter engine | 246 |
-| Sprint 11 | Prefill edge-case hardening + DB parity harness + twin-docs reconciliation | 317 |
+| Sprint 11 | Prefill edge-case hardening + DB parity harness + twin-docs reconciliation | 317 (local SQLite) |
 
-*Counts match `pytest --collect-only` on the landing commit of each sprint.*
+*Counts reflect the local default `pytest --collect-only` suite on the landing commit of each sprint. PostgreSQL CI status is tracked separately.*
 
 ## Prompt Architecture (v1.1)
 

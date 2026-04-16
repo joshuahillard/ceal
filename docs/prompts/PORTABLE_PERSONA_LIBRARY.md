@@ -177,20 +177,20 @@ This section maps the portable personas above to Ceal-specific context. Replace 
 
 | Persona | Ceal-Specific Scope | Key Files |
 |---------|---------------------|-----------|
-| **Data Engineer** | Async ETL orchestration, SQLite WAL, batch upserts, cross-backend DB parity | `src/main.py`, `src/models/database.py`, `src/models/compat.py` |
+| **Data Engineer** | Async ETL orchestration, SQLite WAL, batch upserts, cross-backend DB behavior with PostgreSQL schema-loader fix still pending | `src/main.py`, `src/models/database.py`, `src/models/compat.py` |
 | **Backend Engineer** | Pydantic v2 contracts: RawJobListing -> JobListingCreate -> JobListing, Phase 2 model hierarchy | `src/models/entities.py`, `src/tailoring/models.py`, `src/tailoring/db_models.py` |
 | **AI Architect** | Claude API via httpx (ranker + tailoring), Vertex AI regime classification, RANKER_VERSION tracking | `src/ranker/llm_ranker.py`, `src/tailoring/engine.py`, `src/ranker/regime_classifier.py` |
 | **Product Manager** | 4-phase rollout (Scrape -> Tailor -> CRM -> Auto-Apply), Tier 1/2/3 company targeting, X-Y-Z bullets | `CEAL_PROJECT_LEDGER.md`, career/ folder |
 | **DevOps** | GitHub Actions (6 jobs), Docker + docker-compose, GCP Cloud Run, Cloud SQL, Alembic | `.github/workflows/ci.yml`, `Dockerfile`, `docker-compose.yml`, `deploy/` |
 | **Career Strategist** | Google L5 TPM + Stripe/Datadog TSE targeting, $12M save narrative, AI-orchestrated dev story | career/ folder, LinkedIn posts |
-| **QA Lead** | 317 tests (unit + integration), frozen LLM fixtures, CI gate enforcement, DB parity coverage | `tests/unit/`, `tests/integration/`, `pyproject.toml` |
+| **QA Lead** | 317 local SQLite tests (unit + integration), frozen LLM fixtures, CI gate enforcement, PostgreSQL DB job currently red on schema init | `tests/unit/`, `tests/integration/`, `pyproject.toml` |
 
 ### Ceal Performance Metrics (All Personas Accountable)
 - Pipeline throughput: 500+ listings in ~8 seconds (95% reduction from sync baseline)
 - Data contracts: 0% corrupt records entering production database
 - AI drift: RANKER_VERSION column tracks prompt versions for A/B testing
 - Shipping cadence: tag and release at end of each sprint
-- Test suite: 317 passing, 0 warnings, ruff clean
+- Test suite: 317 passing locally under SQLite, 0 warnings, ruff clean; PostgreSQL DB CI fix pending
 
 ---
 

@@ -170,18 +170,18 @@ On April 2, `main` was reset to `codex/semantic-fidelity-guardrail`, which lost 
 
 **What shipped:**
 - **Sprint 11 hardening:** Prefill engine edge-case coverage for empty, whitespace, unicode, and malformed resume inputs
-- **DB parity:** SQLite/PostgreSQL round-trip harness validating backend-aware behavior instead of relying on route-layer mocks
+- **DB parity groundwork:** SQLite round-trip coverage landed and PostgreSQL parity tests were added to CI, but PostgreSQL is still red on schema-loader multi-statement init
 - **Canonical docs reconciliation:** Re-merged active onboarding, prompt, reference, and strategy docs into `ceal/docs/`
 - **Claude Code fast-path fix:** Corrected stale source paths, prompt locations, and repo-state counts in the active AI entrypoints
 
 **Commits:** `e5fa565` (prefill hardening + DB parity), `fe607aa` (historical/reference rescue), `29b12b2` (RULES merge), `5697e43` (PROMPT_REGISTRY merge), `bfdb481` (PROJECT_CONTEXT correction), `509b722` (master prompt key-doc fix)
-**Test count:** 246 -> 317
+**Test count:** 246 -> 317 (local default SQLite suite)
 **Effort:** High. Hardening and docs reconciliation both required source-verifying the canonical docs against the live repo tree.
 
 **Retrospective:**
-- *What went well:* The DB parity harness closed the mock blind spot quickly. Re-centering onboarding inside `ceal/docs/` restored a single canonical source of truth for AI sessions.
-- *What went wrong:* Parallel top-level and in-repo doc trees drifted. Claude Code, Codex, and Gemini entrypoints pointed at deleted paths and stale counts, which forced repeated re-verification and slowed every session.
-- *Lesson:* AI entrypoints are operational infrastructure. When code paths or canonical doc locations move, `CLAUDE.md`, runtime prompts, onboarding docs, and the ledger must be updated in the same change window.
+- *What went well:* The SQLite-first parity harness closed the mock blind spot quickly. Re-centering onboarding inside `ceal/docs/` restored a single canonical source of truth for AI sessions.
+- *What went wrong:* Parallel top-level and in-repo doc trees drifted, and PostgreSQL CI stayed red because the schema loader still sends multi-command SQL through asyncpg prepared statements.
+- *Lesson:* AI entrypoints are operational infrastructure, and backend-parity claims must track CI reality. When code paths or canonical doc locations move, `CLAUDE.md`, runtime prompts, onboarding docs, and the ledger must be updated in the same change window.
 
 ---
 
@@ -241,7 +241,7 @@ On April 2, `main` was reset to `codex/semantic-fidelity-guardrail`, which lost 
 
 | Metric | Phase 0 | Phase 1 | Current |
 |--------|---------|---------|---------|
-| **Tests passing** | 0 | 93 | 317 |
+| **Tests passing** | 0 | 93 | 317 local (SQLite) |
 | **Source files** | 1 | ~15 | 60+ |
 | **Database tables** | 1 | 7 | 13 |
 | **Git commits** | 1 | 8 | 49 |
@@ -262,6 +262,7 @@ On April 2, `main` was reset to `codex/semantic-fidelity-guardrail`, which lost 
 | TD-003 | Existing `ceal.db` won't have Sprint 9 regime columns (CREATE TABLE IF NOT EXISTS doesn't ALTER). Need Alembic migration or manual ALTER TABLE. | Medium | Sprint 9 | Open |
 | TD-004 | No prompt registry — `RANKER_VERSION` tracks version but no document maps version to actual prompt text. | Medium | Phase 1 | Resolved (PROMPT_REGISTRY.md created April 3) |
 | TD-005 | Two schema files (`schema.sql` + `schema_postgres.sql`) must be kept in sync manually. | Low | Sprint 6 | Open |
+| TD-006 | PostgreSQL DB Tests CI fails because the schema loader sends multi-command SQL blocks (including `DO $$ ... $$` / trigger setup) through asyncpg prepared statements. | High | Sprint 11 | Open |
 
 ---
 
@@ -277,7 +278,7 @@ On April 2, `main` was reset to `codex/semantic-fidelity-guardrail`, which lost 
 > Delivered 10 engineering sprints in 7 days — from CLI prototype to production-ready web application with Docker containerization, Cloud SQL, Vertex AI classification, PDF generation, CRM, and auto-apply — scaling from 93 to 246 automated tests with zero regressions, by developing an 8-pillar anti-hallucination prompt framework enabling deterministic multi-AI development across Claude, Codex, and Gemini.
 
 **Sprint 11 (Hardening + Reconciliation):**
-> Hardened Ceal for dual-backend reliability and restored canonical AI onboarding as measured by 317 passing tests and zero lint failures, by adding SQLite/PostgreSQL parity coverage, prefill edge-case tests, and a source-verified Claude Code documentation reconciliation pass.
+> Hardened Ceal's local SQLite path and restored canonical AI onboarding as measured by 317 passing local tests and zero lint failures, by adding prefill edge-case coverage, landing PostgreSQL parity groundwork, and running a source-verified Claude Code documentation reconciliation pass.
 
 ---
 

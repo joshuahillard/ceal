@@ -143,8 +143,8 @@ Attach only when the task depends on volatile repo state.
 ```
 SNAPSHOT:
 - Branch: main | Latest release tag: v2.10.0-sprint10-pdf-generation
-- Tests: 317 passing, 0 warnings, ruff clean
-- Known issues: [list any relevant failing tests, open bugs, or blockers]
+- Tests: 317 passing locally under SQLite, 0 warnings, ruff clean
+- Known issues: PostgreSQL DB Tests CI currently fails on schema-loader multi-statement init (`cannot insert multiple commands into a prepared statement`)
 - Recent context: [1-2 sentences if prior work in this session matters]
 ```
 
@@ -244,8 +244,8 @@ Out of scope: Web routes, tailoring engine, CLI flags.
 
 SNAPSHOT:
 - Branch: main | Latest release tag: v2.10.0-sprint10-pdf-generation
-- Tests: 317 passing
-- Known issues: CREATE TABLE IF NOT EXISTS doesn't ALTER for new columns (TD-003)
+- Tests: 317 passing locally under SQLite
+- Known issues: TD-003 — existing DBs missing regime columns; PostgreSQL DB Tests CI currently fails on schema-loader multi-statement init
 
 Implement Part A only: Alembic config + initial migration. Stop after committing.
 

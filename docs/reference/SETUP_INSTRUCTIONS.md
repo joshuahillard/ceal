@@ -101,8 +101,8 @@ Most tasks don't need this. Only add it when the task depends on knowing the cur
 ```
 SNAPSHOT:
 - Branch: main | Latest release tag: v2.10.0-sprint10-pdf-generation
-- Tests: 317 passing, 0 warnings, ruff clean
-- Known issues: TD-003 — existing DBs missing regime columns
+- Tests: 317 passing locally under SQLite, 0 warnings, ruff clean
+- Known issues: TD-003 — existing DBs missing regime columns; PostgreSQL DB Tests CI currently fails on schema-loader multi-statement init
 ```
 
 ### Step 5: Paste and Go

@@ -46,6 +46,12 @@ Verified current repo-state values used in the reconciliation:
 - Integration test files: `6`
 - Latest release tag: `v2.10.0-sprint10-pdf-generation`
 
+Scope note:
+
+- This verification covered the local default SQLite test run (`python -m pytest ...`) and lint.
+- It did not prove PostgreSQL CI was green.
+- As of April 16, 2026, `origin/main` still fails the `DB Tests (PostgreSQL)` GitHub Actions job on the schema-loader multi-statement asyncpg error (`cannot insert multiple commands into a prepared statement`).
+
 ---
 
 ## Why These Changes Matter
