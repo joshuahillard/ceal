@@ -78,3 +78,4 @@ At session end, produce:
 | Prompt Architecture | docs/prompts/MASTER_PROMPT_ARCHITECTURE.md |
 | Persona Library | docs/prompts/PORTABLE_PERSONA_LIBRARY.md |
 | Anti-Hallucination Rules | docs/ai-onboarding/RULES.md |
+| Prompt Registry | docs/prompts/PROMPT_REGISTRY.md |
