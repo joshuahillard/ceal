@@ -54,3 +54,12 @@ signatures_required:
 # the adapter module named below is resolved at runtime.
 # Allowed: linear | clickup | notion | jira
 active_tracker: "linear"                # [UNVERIFIED]
+
+# Tracker-specific configuration. Subkey must match active_tracker above;
+# the active adapter reads only its own subkey at runtime.
+# Secrets (API tokens) are NEVER stored here -- the adapter reads them
+# from environment variables at instantiation.
+# Linear adapter reads LINEAR_API_KEY at construction.
+tracker_config:
+  linear:
+    team_id: "[UNVERIFIED]"             # Linear team UUID, e.g. "abc-123-def-456"
