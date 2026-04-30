@@ -1,6 +1,6 @@
 # Ceal Master Prompt Architecture
 **Human-facing reference: how the prompt system works and why**
-*Owner: Josh Hillard | Created: April 3, 2026 | Version: 1.1*
+*Owner: Josh Hillard | Created: April 3, 2026 | Version: 1.2 | Updated: April 24, 2026*
 
 ---
 
@@ -39,7 +39,7 @@ TASK CARD (per task, ~150-250 tokens)
 
 MODE PACK (optional, ~60-120 tokens)
   Domain-specific rules. Activated by task type, not persona narrative.
-  Available: MODE: db, MODE: ml, MODE: web, MODE: product, MODE: infra
+  Available: MODE: db, MODE: ml, MODE: web, MODE: product, MODE: infra, MODE: pilot
 ```
 
 **Optional: SNAPSHOT block** (~50-100 tokens)
@@ -52,6 +52,22 @@ Attach only when the task depends on current branch, tag, failing tests, or othe
 - Multi-message continuation: **~100-150 tokens** (commit hash + delta description)
 
 Compared to v1.0 (~1,900) and the original approach (~19K-44K), this is a 3-4x and 30-70x reduction respectively.
+
+## Sprint 12 Addition: Corpus-First Pilot Pack
+
+Sprint 11 introduced a new pilot-platform slice (`pilots/`, `handoff_lint.py`,
+tracker adapter boundary, and golden corpus artifacts). The prompt system now
+needs an explicit rule for that surface:
+
+- pilot tasks are **artifact-bound**, not imagination-bound
+- the source-of-truth order is `handoff_spec.md -> pilot_profile.yaml -> golden_corpus.jsonl -> SELF_REVIEW.md`
+- unsupported cases fail safe (`ESCALATE`) rather than filling gaps
+
+This matters because the current `golden_corpus.jsonl` is still placeholder-heavy.
+Prompt text must not accidentally convert placeholder examples into production
+claims. To keep token cost low, Sprint 12 adds a compact `MODE: pilot` and a
+small set of specialized mini-prompts in `SPRINT12_PILOT_PROMPTS.md` instead of
+inflating the universal core contract.
 
 ---
 
@@ -81,6 +97,7 @@ Claude Code doesn't need career context to implement a database migration. Owner
 2. Append to `CEAL_PROJECT_LEDGER.md` (timeline entry, retrospective, any new ADRs)
 3. If a new hard rule was adopted, add it to the Core Contract
 4. If a Mode Pack needs a new rule, add it
+5. If pilot corpus shape or hallucination policy changed, update `MODE: pilot` and `SPRINT12_PILOT_PROMPTS.md`
 
 ### After stack changes:
 1. Update the Core Contract's stack line
@@ -99,6 +116,7 @@ Claude Code doesn't need career context to implement a database migration. Owner
 | `MASTER_PROMPT_ARCHITECTURE.md` | Human reference | This doc — explains the system |
 | `RUNTIME_PROMPTS.md` | Copy-paste runtime | Core Contract, Task Card template, Mode Packs, Snapshot |
 | `CLAUDE_CODE_MASTER_PROMPT.md` | Claude Code config | Full instructions file for Claude Code sessions |
+| `SPRINT12_PILOT_PROMPTS.md` | Copy-paste runtime | Lean pilot/corpus/hallucination-control prompts |
 | `PORTABLE_PERSONA_LIBRARY.md` | Human reference | Thinking frameworks for interview prep and mental models |
 | `CEAL_PROJECT_LEDGER.md` | Living record | Timeline, decisions, retrospectives |
 | `PROMPT_REGISTRY.md` | Repo artifact | LLM prompt version tracking |
@@ -106,4 +124,4 @@ Claude Code doesn't need career context to implement a database migration. Owner
 ---
 
 *Architecture designed by: Josh Hillard + Claude*
-*v1.0: April 3, 2026 | v1.1: April 3, 2026 (lean revision based on critical review)*
+*v1.0: April 3, 2026 | v1.1: April 3, 2026 (lean revision) | v1.2: April 24, 2026 (Sprint 12 pilot-platform alignment)*

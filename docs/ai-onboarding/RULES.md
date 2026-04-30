@@ -1,6 +1,6 @@
 # Céal — Engineering Rules
 **Hard constraints that apply to every task, every sprint, every AI session**
-*Last updated: April 16, 2026 — merged from top-level + in-repo drafts, Sprints 9-10 additions preserved*
+*Last updated: April 24, 2026 — Sprint 12 pilot-platform prompt overlay synced*
 
 ---
 
@@ -12,7 +12,7 @@ The Core Contract in `docs/prompts/RUNTIME_PROMPTS.md` contains a compact runtim
 
 ---
 
-## Part I — AI Session Meta-Rules (Core Contract v1.1)
+## Part I — AI Session Meta-Rules (Core Contract v1.2)
 
 These rules govern how AI assistants operate within a session. They are pasted into every session via the Core Contract.
 
@@ -28,6 +28,18 @@ These rules govern how AI assistants operate within a session. They are pasted i
 | 8 | Ask one brief question only if ambiguity creates material risk. | Minimize back-and-forth. Most ambiguity can be resolved by reading the code. |
 | 9 | Do not fabricate file paths, function names, or test results. | AI hallucination is the #1 failure mode. If uncertain, search first. |
 | 10 | Do not modify `schema.sql` without also updating `schema_postgres.sql`. | Dual-schema system (ADR-003). SQLite dev and PostgreSQL prod must stay in sync. |
+
+### Sprint 12 Pilot Overlay
+
+The historical rule numbering below is preserved to avoid breaking ADR and
+prompt-registry references. The following v1.2 additions apply when a task
+touches pilots, handoffs, eval harnesses, or hallucination control:
+
+- Corpus-first source of truth: `handoff_spec.md -> pilot_profile.yaml -> golden_corpus.jsonl -> SELF_REVIEW.md`
+- Never invent customer facts, citations, KB IDs, tracker IDs, payload examples, or tool calls
+- If evidence is missing, preserve `[UNVERIFIED]` or escalate; do not fill gaps
+- Golden corpus defines the supported pilot behavior envelope; unsupported cases fail safe
+- Keep prompts compact: source-of-truth order, schema, and stop conditions; avoid repeated narrative
 
 ---
 

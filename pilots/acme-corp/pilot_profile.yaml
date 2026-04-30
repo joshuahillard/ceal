@@ -1,0 +1,56 @@
+# acme-corp pilot profile
+# Binds to: Maven_OS_Enterprise_Malleability_Analysis.md Part D (Modular Gate Model).
+# All values below are PLACEHOLDER; every field is [UNVERIFIED] until
+# pilot intake signs off this profile and a hash-locked entry exists in
+# pilots/acme-corp/ledger.jsonl (event_type: pilot_profile_signed).
+#
+# Hard gates (Discovery, Validation, Authorization) are invariant across
+# every pilot. The fields below select the fluid modules between the
+# hard gates and resolve the signature set for the Authorization gate.
+
+pilot_id: "acme-corp-csx-q2"            # [UNVERIFIED]
+customer_id: "acme-corp"                # [UNVERIFIED]
+
+# pilot_shape drives which modules run between hard gates.
+# Allowed: greenfield_integration | config_tweak | expansion | regulated_first
+pilot_shape: "greenfield_integration"   # [UNVERIFIED]
+
+# complexity drives default max_duration_days per module (not set here; set
+# in pilot_state_machine.yaml, out of week-one scope).
+# Allowed: low | medium | high
+complexity: "medium"                    # [UNVERIFIED]
+
+# risk_vertical drives the signature set below. non-"none" values add
+# compliance_officer to signatures_required.
+# Allowed: none | hipaa | pci | sox | gdpr_sensitive
+risk_vertical: "none"                   # [UNVERIFIED]
+
+# duration_weeks is used only as a sanity check against module selection.
+# Allowed: 1 | 2 | 3 | 4 | 5 | 6
+duration_weeks: 6                       # [UNVERIFIED]
+
+# Module selection between hard gates.
+# Each value: required | optional | skipped. eval_harness is always
+# required (it is part of the Validation hard gate).
+modules:
+  schema_discovery: "required"
+  api_handshake: "required"
+  knowledge_ingest: "required"
+  eval_harness: "required"              # never skipped
+  edge_case_hardening: "required"
+  stakeholder_signoff: "standard"       # standard | extended_compliance | lightweight
+
+# Signature set resolved from pilot_shape x risk_vertical. The
+# Authorization hard gate refuses go-live unless every signature below
+# is present in pilots/acme-corp/readiness_signoff.md with a
+# sub-second UTC timestamp.
+signatures_required:
+  - "im_lead"
+  - "engineering_lead"
+  - "customer_sponsor"
+  # - "compliance_officer"              # add when risk_vertical != none
+
+# Active tracker selection. No SDK imports outside tools/tracker_adapter/;
+# the adapter module named below is resolved at runtime.
+# Allowed: linear | clickup | notion | jira
+active_tracker: "linear"                # [UNVERIFIED]

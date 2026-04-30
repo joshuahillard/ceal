@@ -1,6 +1,6 @@
 # Ceal Runtime Prompts
 **Copy-paste blocks for AI sessions. Nothing in this file is for humans to read — it's all model input.**
-*Version: 1.1 | April 3, 2026 | Reconciled: April 16, 2026*
+*Version: 1.2 | April 24, 2026*
 
 ---
 
@@ -9,12 +9,15 @@
 Paste once at session start. Stable across sprints — only update when the stack or rules change.
 
 ```
-CEAL CORE v1.1
+CEAL CORE v1.2
 
-Project: Ceal is an async career-signal engine for job listings.
-Core flow: Scrape -> Normalize -> Rank.
-Extended modules: tailoring, CRM, auto-apply, PDF generation.
-Web UI: FastAPI + Jinja2 (6 routes + health).
+Project: Ceal is dual-track.
+- Legacy core: async career-signal engine for job listings.
+- Sprint 12 direction: pilot-platform for customer handoffs, eval harnesses, and hallucination-resistant operations.
+
+Default priority:
+- If the task touches pilots, handoffs, evals, corpus alignment, or support automation, follow Sprint 12 pilot-platform direction.
+- If the task touches scrape/normalize/rank/tailor, preserve the legacy pipeline without expanding scope.
 
 Stack: Python 3.10+, FastAPI/Jinja2, asyncio/aiohttp, Pydantic v2,
 SQLAlchemy 2.0 async, SQLite dev (WAL) / PostgreSQL prod (Cloud SQL),
@@ -24,6 +27,11 @@ Rules:
 - Read each file before editing it. Search before assuming symbols exist.
 - Pydantic v2 at module boundaries. No raw dict payloads across modules.
 - LLM output is untrusted. Parse JSON, validate fields and score bounds.
+- Pilot output is corpus-bound. For pilot tasks, source-of-truth order is:
+  handoff_spec.md -> pilot_profile.yaml -> golden_corpus.jsonl -> SELF_REVIEW.md.
+- Never invent customer facts, citations, KB IDs, payload examples, tracker IDs, or tool calls.
+- If evidence is missing, preserve [UNVERIFIED] or escalate; do not fill gaps.
+- Golden corpus defines supported pilot shapes. Do not drift beyond its intent/tool/escalation patterns without an explicit version change.
 - DB writes are idempotent (ON CONFLICT). No duplicate records.
 - Keep diffs minimal and local to the task.
 - PowerShell 5 compatible ($env: syntax, no BOM encoding).
@@ -31,6 +39,7 @@ Rules:
 - Ask one brief question only if ambiguity creates material risk.
 - Do not fabricate file paths, function names, or test results.
 - Keep `schema.sql` and `schema_postgres.sql` in sync.
+- Keep prompts compact: role, source-of-truth order, schema, stop conditions. Avoid narrative repetition.
 - Verify context at session start with `pwd` and `git remote -v`.
 
 Key paths:
@@ -38,8 +47,9 @@ Key paths:
 - Tailoring: src/tailoring/ (models, parser, extractor, engine)
 - Web: src/web/ (app.py, routes/, templates/)
 - DB: src/models/ (database.py, schema.sql, schema_postgres.sql, compat.py)
+- Pilot: ceal/pilots/, ceal/tools/handoff_lint.py, ceal/tools/tracker_adapter/, ceal/.github/workflows/handoff-lint.yml
 - Tests: tests/unit/, tests/integration/
-- Docs: docs/prompts/, docs/ai-onboarding/, docs/sprints/
+- Docs: docs/prompts/, docs/ai-onboarding/, docs/sprints/, docs/planning/SELF_REVIEW.md
 ```
 
 ---
@@ -104,6 +114,17 @@ MODE: ml
 - Use frozen fixtures in unit tests. Never live API calls.
 ```
 
+### MODE: pilot
+```
+MODE: pilot
+- Sprint 12 default: operationalize pilot-platform artifacts before adding net-new ranker features.
+- Source-of-truth order: ceal/pilots/<pilot>/handoff_spec.md -> ceal/pilots/<pilot>/pilot_profile.yaml -> ceal/pilots/<pilot>/golden_corpus.jsonl -> ceal/pilots/<pilot>/ledger.jsonl -> ceal/docs/planning/SELF_REVIEW.md -> ceal/tools/handoff_lint.py.
+- Never invent customer facts, citations, KB IDs, tracker IDs, payload examples, or tool calls.
+- If corpus/handoff lacks evidence, preserve [UNVERIFIED] or return ESCALATE.
+- Golden corpus is the acceptance boundary: supported outputs must map to an existing intent/tool/escalation shape, or be rejected.
+- Prefer enums, short schemas, and one example max. Do not spend tokens re-explaining project history.
+```
+
 ### MODE: web
 ```
 MODE: web
@@ -143,10 +164,25 @@ Attach only when the task depends on volatile repo state.
 ```
 SNAPSHOT:
 - Branch: main | Latest release tag: v2.10.0-sprint10-pdf-generation
-- Tests: 317 passing locally under SQLite, 0 warnings, ruff clean
+- Tests: 332 passing locally under SQLite after Sprint 11 self-review, ruff clean
 - Known issues: PostgreSQL DB Tests CI currently fails on schema-loader multi-statement init (`cannot insert multiple commands into a prepared statement`)
-- Recent context: [1-2 sentences if prior work in this session matters]
+- Recent context: Sprint 12 direction is pilot-platform alignment; handoff-lint workflow and acme-corp pilot scaffold exist on disk.
 ```
+
+---
+
+## SPRINT 12 PILOT PACK
+
+Use the canonical file instead of copying prompt text from here:
+- `docs/prompts/SPRINT12_PILOT_PROMPTS.md`
+
+Current canonical version:
+- `CEAL S12 PILOT MASTER v1.2`
+
+Hard rule:
+- When using the Sprint 12 pilot pack, treat `docs/prompts/SPRINT12_PILOT_PROMPTS.md`
+  as the single source of truth for pilot-specific prompt text and verdict
+  semantics.
 
 ---
 
@@ -266,4 +302,4 @@ State: 2 migrations exist (initial + regime columns). Need to wire auto-migrate 
 
 ---
 
-*Runtime prompts v1.1. See MASTER_PROMPT_ARCHITECTURE.md for design rationale.*
+*Runtime prompts v1.2. See MASTER_PROMPT_ARCHITECTURE.md and SPRINT12_PILOT_PROMPTS.md for design rationale and compact pilot-specific variants.*

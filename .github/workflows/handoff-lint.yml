@@ -1,0 +1,87 @@
+# ---------------------------------------------------------------------------
+# Maven Implementation OS: Handoff Lint Gate
+# ---------------------------------------------------------------------------
+# Runs on pull requests that touch pilot handoff material, the linter
+# itself, or its tests. Exits with the same four disposition codes the
+# linter emits in-process:
+#
+#   0 = PASS             merge can proceed
+#   1 = BLOCK            structural violation; fix before merge
+#   2 = ESCALATE         schema delta >25%; requires IM Lead sign-off
+#   3 = HARNESS_FAULT    linter could not reach a verdict; investigate
+#
+# PASS is the only non-failing code. ESCALATE and BLOCK both fail the
+# job so a human must act. HARNESS_FAULT fails loudly rather than
+# silently skipping.
+#
+# Path filter intentionally narrow so the gate does not run on every
+# PR. If the filter changes, re-confirm the trigger set still covers
+# every file path whose contents the linter's output depends on.
+#
+# Baseline resolution (closes SELF_REVIEW finding #1): the 25% schema-
+# delta rule compares the current handoff_spec.md against the version
+# on the PR base branch (origin/${{ github.base_ref }}), resolved via
+# handoff_lint.py --baseline-from-git-ref. New pilots (file absent on
+# base) fall through to delta_check=skipped_no_baseline. Tags and
+# ledger artifacts are intentionally NOT used as baselines.
+# ---------------------------------------------------------------------------
+
+name: Handoff Lint
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "pilots/**"
+      - "tools/handoff_lint.py"
+      - "tools/tracker_adapter/**"
+      - "tests/unit/test_handoff_lint.py"
+      - ".github/workflows/handoff-lint.yml"
+
+concurrency:
+  group: handoff-lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  handoff-lint:
+    name: "Handoff Lint (ruff + pytest + baselined CLI)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # fetch-depth=2 preserves HEAD+prev reach for other tooling;
+          # the baseline for the 25% delta rule is fetched explicitly
+          # from origin/<base_ref> in a later step.
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-3.11-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-3.11-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Ruff check (tools + handoff tests)
+        run: python -m ruff check tools/ tests/unit/test_handoff_lint.py
+
+      - name: Unit tests (handoff_lint)
+        run: python -m pytest tests/unit/test_handoff_lint.py -v --tb=short
+
+      - name: Fetch PR base branch tip for baseline resolution
+        run: git fetch --no-tags --depth=1 origin ${{ github.base_ref }}
+
+      - name: Lint shipped pilot handoff against base-branch baseline
+        run: |
+          python -m tools.handoff_lint pilots/acme-corp/handoff_spec.md \
+            --baseline-from-git-ref origin/${{ github.base_ref }}

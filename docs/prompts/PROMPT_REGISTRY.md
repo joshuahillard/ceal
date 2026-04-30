@@ -1,6 +1,6 @@
 # Ceal Prompt Registry
 **Version tracking for all LLM prompts used in the system**
-*Owner: AI Architect persona | Created: April 3, 2026 | Last updated: April 16, 2026*
+*Owner: AI Architect persona | Created: April 3, 2026 | Last updated: April 24, 2026*
 
 ---
 
@@ -84,6 +84,21 @@ Every LLM prompt in Ceal is source code — it must be versioned, tracked, and a
 | Prompt ID | Component | Retired | Reason |
 |-----------|-----------|---------|--------|
 | *(none yet)* | | | |
+
+---
+
+## Session Prompt Artifacts (Not Persisted)
+
+These are operator/session prompts stored in `docs/prompts/`. They are not
+logged in the database, but they are versioned because they define how work is
+scoped and how hallucination controls are applied during AI sessions.
+
+| Prompt ID | Location | Version | Purpose |
+|-----------|----------|---------|---------|
+| `SESSION_CORE_V1.2` | `docs/prompts/CLAUDE_CODE_MASTER_PROMPT.md` + `docs/prompts/RUNTIME_PROMPTS.md` | `v1.2` | Updates the core session contract for Sprint 12 and adds corpus-first pilot rules. |
+| `SPRINT12_PILOT_GUARDRAILS_V1` | `docs/prompts/SPRINT12_PILOT_PROMPTS.md` | `v1.2` | Lean prompt pack for pilot alignment, golden corpus adherence, and hallucination fail-safe behavior. v1.2 codifies verdict precedence (`HARNESS_FAULT > BLOCK > ESCALATE > PASS`) and makes `RUNTIME_PROMPTS.md` point to the canonical prompt file instead of embedding a drifting copy. |
+| `SPRINT12_NEXT_STEP_V1` | `docs/prompts/SPRINT12_NEXT_STEP_PROMPT.md` | `v1.0` | Ready-to-paste Claude continuation prompt for the next concrete Sprint 12 task: resolving a real handoff baseline in CI so `handoff_lint` can enforce the 25 percent schema-delta rule on pull requests. |
+| `SPRINT12_TRACKER_ADAPTER_V1` | `docs/prompts/SPRINT12_TRACKER_ADAPTER_PROMPT.md` | `v1.0` | Ready-to-paste Claude continuation prompt for the next concrete Sprint 12 task after baseline resolution: implementing the first concrete tracker adapter, aligned to `active_tracker: "linear"` and the existing `TrackerAdapter` Protocol boundary. |
 
 ---
 

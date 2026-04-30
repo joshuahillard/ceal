@@ -185,6 +185,32 @@ On April 2, `main` was reset to `codex/semantic-fidelity-guardrail`, which lost 
 
 ---
 
+#### Wednesday-Friday, April 22-24 — Sprint 12 / Maven OS Week-One: Pilot Platform Foundation
+
+**Session duration:** Multi-session across three days
+**Personas active:** TPM (lead), Backend Engineer, QA Lead, AI Architect
+
+**What shipped:**
+- **Handoff lint pipeline:** `tools/handoff_lint.py` with PASS/BLOCK/ESCALATE/HARNESS_FAULT exit codes, 25% schema-delta rule, git-rev baseline resolution (`--baseline-from-git-ref`), 18 unit tests
+- **Tracker adapter boundary:** `tools/tracker_adapter/__init__.py` Protocol-only; no concrete adapter
+- **acme-corp pilot scaffold:** 15-anchored `handoff_spec.md`, modular `pilot_profile.yaml`, 20-case `golden_corpus.jsonl` (35% adversarial), empty `ledger.jsonl` placeholder
+- **GHA gate:** `.github/workflows/handoff-lint.yml` triggered by `pilots/**`, the linter, its tests, or the workflow itself; baseline resolved from `origin/<base_ref>`
+- **Prompt system v1.1 -> v1.2:** added `MODE: pilot`, corpus-first rules, verdict precedence (`HARNESS_FAULT > BLOCK > ESCALATE > PASS`), three Sprint 12 prompt files in `docs/prompts/`
+- **Self-review:** `docs/planning/SELF_REVIEW.md` with 10 findings (#1 resolved within Week-One, #7 closed by ADR-009)
+- **PyYAML pin:** `requirements.txt` and `pyproject.toml` updated; ADR-009 records the decision
+
+**Commits:** Maven-OS-W1 foundation bundled and committed retroactively on April 30, 2026
+**Test count:** 317 -> 335 (local default SQLite suite, 18 new handoff_lint tests)
+**Tags:** None (Maven OS Week-One is a parallel track to legacy career-pipeline release tags)
+**Effort:** High. New surface area: linter, GHA gate, pilot scaffold, prompt v1.2, ADR-009.
+
+**Retrospective:**
+- *What went well:* Linter ships with structurally meaningful delta computation (leaf-path symmetric difference, not naive text diff). GHA gate resolves baseline from PR base branch, so the 25% rule actually gates instead of silently skipping. SELF_REVIEW captured both shipped wins and unresolved gaps in the same document.
+- *What went wrong:* Week-One artifacts shipped to disk on April 22-24 but were not committed for six days. The April 30 session inherited a working tree containing untracked Maven OS code, untracked Sprint 12 prompts, and unrelated doc mods, requiring a scope-and-stage triage before any new work could begin.
+- *Lesson:* Files-on-disk is not shipped. Every session ends either with `git log` confirming the commit, or with an explicit in-flight marker so the next session inherits clarity instead of entropy.
+
+---
+
 ## Decision Log
 
 ### ADR-001: Pydantic v2 at Every Pipeline Boundary (March 28)
@@ -235,13 +261,19 @@ On April 2, `main` was reset to `codex/semantic-fidelity-guardrail`, which lost 
 **Trade-off:** Lost the original commit history for those features. Mitigated by session notes documenting what was lost and when it was recovered.
 **Status:** Resolved. All features recovered by Sprint 10.
 
+### ADR-009: PyYAML as Top-Level Dependency (April 22, 2026)
+**Decision:** Pin `PyYAML==6.0.3` as a top-level entry in `requirements.txt` and `pyproject.toml`. Previously transitively installed.
+**Why:** The Maven OS Week-One handoff linter needs a YAML parser to extract fenced `yaml` blocks from `pilots/<pilot>/handoff_spec.md`. The linter is now a CI gate; a transitively-installed parser could vanish without notice when a parent dependency is upgraded, breaking the gate at runtime.
+**Trade-off:** Exact pin maximizes reproducibility of the lint gate; security fixes land via deliberate bump rather than silent transitive upgrade. `ruamel.yaml` not evaluated.
+**Status:** Active. Single consumer: `tools/handoff_lint.py`. Full text at `docs/reference/ADR-009-pyyaml.md`. ADR recorded retroactively on April 30, 2026 to close SELF_REVIEW finding #7.
+
 ---
 
 ## Cumulative Metrics
 
 | Metric | Phase 0 | Phase 1 | Current |
 |--------|---------|---------|---------|
-| **Tests passing** | 0 | 93 | 317 local (SQLite) |
+| **Tests passing** | 0 | 93 | 335 local (SQLite) |
 | **Source files** | 1 | ~15 | 60+ |
 | **Database tables** | 1 | 7 | 13 |
 | **Git commits** | 1 | 8 | 49 |
@@ -283,4 +315,4 @@ On April 2, `main` was reset to `codex/semantic-fidelity-guardrail`, which lost 
 ---
 
 *Ledger maintained by: Technical Program Manager persona*
-*Last updated: April 16, 2026*
+*Last updated: April 30, 2026*

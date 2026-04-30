@@ -1,13 +1,18 @@
 # Claude Code Master Prompt — Ceal Project
 **Paste as Claude Code custom instructions or CLAUDE.md**
-*Version: 1.1 | April 3, 2026 | Reconciled: April 16, 2026*
+*Version: 1.2 | April 24, 2026*
 
 ---
 
 ## Core Contract
 
-You are working on Ceal, an async career-signal engine for job listings.
-Core flow: Scrape -> Normalize -> Rank. Extended modules: tailoring, CRM, auto-apply, PDF generation. Web UI: FastAPI + Jinja2 (6 routes + health).
+You are working on Ceal, now a dual-track system:
+- legacy core: async career-signal engine for job listings
+- Sprint 12 direction: pilot-platform for customer handoffs, eval harnesses, and operational guardrails
+
+When tasks touch pilots, handoffs, evals, or hallucination prevention, prioritize the Sprint 12 pilot-platform direction over net-new ranker feature work.
+
+Legacy flow: Scrape -> Normalize -> Rank. Extended modules: tailoring, CRM, auto-apply, PDF generation. Pilot surface: `pilots/`, `tools/handoff_lint.py`, `tools/tracker_adapter/`, and pilot-specific docs/workflows.
 
 Stack: Python 3.10+, FastAPI/Jinja2, asyncio/aiohttp, Pydantic v2, SQLAlchemy 2.0 async, SQLite dev (WAL) / PostgreSQL prod (Cloud SQL), Docker, GitHub Actions CI, Claude API via httpx, Vertex AI.
 
@@ -23,6 +28,11 @@ Rules:
 9. Do not fabricate file paths, function names, or test results.
 10. Do not modify schema.sql without also updating schema_postgres.sql.
 11. At session start, verify context: run `pwd` and `git remote -v` to confirm the correct repo. If wrong, stop and ask before proceeding.
+12. Corpus-first for pilot work: use `handoff_spec.md`, `pilot_profile.yaml`, `golden_corpus.jsonl`, and `SELF_REVIEW.md` as the source of truth before any narrative docs.
+13. Never invent customer facts, citations, KB IDs, tracker IDs, payload examples, or tool calls. If evidence is missing, preserve `[UNVERIFIED]` or escalate.
+14. Treat golden corpus rows as the acceptance boundary for supported pilot behavior. Do not drift beyond the listed intent/tool/escalation shapes without an explicit prompt/version change.
+15. Placeholder corpus content stays placeholder. Do not launder `[UNVERIFIED]` examples into production-ready claims.
+16. Keep prompts compact: state role, source-of-truth order, schema, and stop conditions; avoid long prose and repeated background.
 
 Key paths:
 - Pipeline: src/main.py, src/scrapers/, src/normalizer/pipeline.py, src/ranker/
@@ -30,7 +40,8 @@ Key paths:
 - Web: src/web/ (app.py, routes/, templates/)
 - DB: src/models/ (database.py, schema.sql, schema_postgres.sql, compat.py)
 - Tests: tests/unit/, tests/integration/
-- Docs: docs/prompts/, docs/ai-onboarding/, docs/sprints/
+- Pilot platform: pilots/, tools/handoff_lint.py, tools/tracker_adapter/, .github/workflows/handoff-lint.yml
+- Docs: docs/prompts/, docs/ai-onboarding/, docs/sprints/, docs/planning/SELF_REVIEW.md
 
 Full project context: docs/ai-onboarding/PROJECT_CONTEXT.md (read before first task).
 
@@ -45,6 +56,8 @@ Full project context: docs/ai-onboarding/PROJECT_CONTEXT.md (read before first t
 **MODE: product** — Owner is Josh Hillard (Google L5 TPM / Stripe TSE targets). Map features to Tier 1/2/3 strategy. Frame as X-Y-Z bullets. Update project ledger.
 
 **MODE: infra** — Docker < 3 min build, CI before merge, config via env vars, rollback documented, update .env.example.
+
+**MODE: pilot** — Source-of-truth order: `handoff_spec.md` -> `pilot_profile.yaml` -> `golden_corpus.jsonl` -> `SELF_REVIEW.md`. Never invent facts outside those artifacts. Prefer PASS/BLOCK/ESCALATE style outcomes over freeform prose. Unsupported or uncited cases escalate.
 
 Full mode pack text: docs/prompts/RUNTIME_PROMPTS.md
 
@@ -76,6 +89,7 @@ At session end, produce:
 | Project Ledger | docs/CEAL_PROJECT_LEDGER.md |
 | Runtime Prompts | docs/prompts/RUNTIME_PROMPTS.md |
 | Prompt Architecture | docs/prompts/MASTER_PROMPT_ARCHITECTURE.md |
+| Sprint 12 Pilot Prompts | docs/prompts/SPRINT12_PILOT_PROMPTS.md |
 | Persona Library | docs/prompts/PORTABLE_PERSONA_LIBRARY.md |
 | Anti-Hallucination Rules | docs/ai-onboarding/RULES.md |
 | Sprint Prompts | docs/sprints/ |
