@@ -1,5 +1,17 @@
 # Maven OS Week-Two Kickoff — Concrete Tracker Adapter + Pipeline Hardening
 
+> **STATUS — 2026-05-04: Executed as a single-session ticket on 2026-04-30.**
+> P1 deliverable (Linear concrete tracker adapter) shipped in commit `6b05a8f`.
+> PyYAML ADR-009 folded in via commit `09bf55c`. SELF_REVIEW closeout in `559b8f7`.
+> Test suite 332 → 355 local, no regressions. Findings #1, #2, #7 closed; findings #11–#15 opened.
+> All P2/P3 items in this prompt remained DEFERRED as planned (see Sprint Review for the full reconciliation).
+> The "Week-Two" label was aspirational — it was a single-day burst, not a multi-day sprint.
+> **Reconciliation:** `docs/planning/sprint_review_20260504.md`
+> **Continuation:** `docs/planning/MAVEN_OS_WEEK_THREE_PROMPT.md`
+> Do NOT re-execute this prompt. It is preserved here as the historical kickoff document for the Week-Two ticket.
+
+---
+
 > **Paste this entire document as the first message in a fresh chat.** The new Claude instance has zero prior conversation history; this prompt is authoritative. Verify every claim by reading the files listed before writing any code.
 
 ---
