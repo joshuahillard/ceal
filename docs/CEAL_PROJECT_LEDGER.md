@@ -211,6 +211,33 @@ On April 2, `main` was reset to `codex/semantic-fidelity-guardrail`, which lost 
 
 ---
 
+#### Monday, May 4, 2026 — Sprint Review + Tech Debt Program Activation
+
+**Session duration:** ~2 hours (planning only, no code touched)
+**Personas active:** TPM (lead), QA Lead, DPM
+
+**What shipped:**
+- **Sprint review** for window 2026-04-27 → 2026-05-04 at `docs/planning/sprint_review_20260504.md`. Reconciled the Maven OS Week-Two single-session ticket (executed 2026-04-30) and surfaced the dormant Career-pipeline track (18 days idle since Sprint 11).
+- **Maven OS Week-Two prompt** retroactively marked as a single-session ticket via STATUS header.
+- **Maven OS Week-Three prompt** authored at `docs/planning/MAVEN_OS_WEEK_THREE_PROMPT.md`, then immediately DEFERRED via STATUS header pending TD-001 and TD-006 closure.
+- **Tech Debt Program activated** at `docs/planning/TECH_DEBT_PROGRAM.md`. Five register items sequenced TD-001 → TD-006 → TD-003 → TD-002 → TD-005 with a 10-step per-item rigor framework: pre-flight tag → branch → baseline → scoped ticket with operator pause → execute → smoke (regression gate + positive root-cause check) → ledger update → session note → commit → merge with rollback path.
+- **TD-001 ticket** scoped at `docs/planning/td_001_route_integration_tests.md`. First execution step is a mock-coverage inventory across all route tests in `tests/unit/test_web.py`; awaits operator confirmation on inventory output before any code.
+- **Track decisions logged:** Career-pipeline ACTIVE 2026-05-04 with scope = TD program only. Maven OS DEFERRED 2026-05-04 until TD-001 and TD-006 [RESOLVED] in register and main CI green.
+
+**Commits:**
+- `0cf42d5` `docs(planning): sprint review 2026-04-27→2026-05-04 + Week-Three kickoff`
+- (this entry's commit) `docs(planning): tech debt program activation + TD-001 ticket + Week-Three deferral`
+
+**Test count:** 355 (unchanged; planning-only)
+**Effort:** Low. Planning + governance only. No code, no test, no schema touched.
+
+**Retrospective:**
+- *What went well:* The sprint review exposed the parallel-track drift before it produced another idle-week pattern. Activating one track and explicitly deferring the other prevents the same shape recurring in week N+1.
+- *What went wrong:* TD-001 was open 32 days before this activation. The 30-day RED threshold was crossed on the activation day, not before. The cadence rules baked into the program (no HIGH >30d uncontested, no idle >3d in-session, sprint review every 7d) exist precisely so this doesn't repeat.
+- *Lesson:* A tech debt register without a program is a list of grievances. The discipline isn't "log the debt" — it's "log the debt AND have a sequenced, gated process for closing it." The 30-day threshold turns soft alarm into hard escalation.
+
+---
+
 ## Decision Log
 
 ### ADR-001: Pydantic v2 at Every Pipeline Boundary (March 28)
@@ -287,9 +314,11 @@ On April 2, `main` was reset to `codex/semantic-fidelity-guardrail`, which lost 
 
 ## Technical Debt Register
 
+> **Active program — 2026-05-04.** Sequence: TD-001 → TD-006 → TD-003 → TD-002 → TD-005. Framework and rollback playbook at `docs/planning/TECH_DEBT_PROGRAM.md`. Per-TD tickets land at `docs/planning/td_NNN_<slug>.md`. TD-001 is the current in-flight item.
+
 | ID | Description | Severity | Introduced | Status |
 |----|-------------|----------|------------|--------|
-| TD-001 | Mock-only route tests hide SQL bugs. Core query functions need DB-level integration tests. | High | Sprint 1 | Open |
+| TD-001 | Mock-only route tests hide SQL bugs. Core query functions need DB-level integration tests. | High | Sprint 1 | Open — in-flight (ticket: `docs/planning/td_001_route_integration_tests.md`) |
 | TD-002 | LLM keyword-stuffs job requirements into resume bullets regardless of candidate's actual skills. Tier prompts need a "only reference skills the candidate has" constraint. | Medium | Sprint 1 | Open |
 | TD-003 | Existing `ceal.db` won't have Sprint 9 regime columns (CREATE TABLE IF NOT EXISTS doesn't ALTER). Need Alembic migration or manual ALTER TABLE. | Medium | Sprint 9 | Open |
 | TD-004 | No prompt registry — `RANKER_VERSION` tracks version but no document maps version to actual prompt text. | Medium | Phase 1 | Resolved (PROMPT_REGISTRY.md created April 3) |
@@ -315,4 +344,4 @@ On April 2, `main` was reset to `codex/semantic-fidelity-guardrail`, which lost 
 ---
 
 *Ledger maintained by: Technical Program Manager persona*
-*Last updated: April 30, 2026*
+*Last updated: May 4, 2026*

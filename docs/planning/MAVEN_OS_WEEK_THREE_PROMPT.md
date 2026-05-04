@@ -1,5 +1,13 @@
 # Maven OS Week-Three Kickoff — Adapter Hardening, Live Smoke, Hygiene Catch-Up
 
+> **STATUS — 2026-05-04: DEFERRED until TD-001 and TD-006 close.**
+> Operator decision 2026-05-04 to focus on the Ceal Tech Debt Program (`docs/planning/TECH_DEBT_PROGRAM.md`) rather than run parallel tracks. Maven OS Week-Three's open decision #3 (Career-pipeline paused or active?) is hereby answered: **Career-pipeline ACTIVE for TD program; Maven OS DEFERRED.**
+> **Resume condition:** TD-001 and TD-006 both [RESOLVED] in the Tech Debt Register, main CI green, AND the sprint review immediately following TD-006 closure confirms no regression.
+> **Do NOT execute this prompt** until those conditions are met. Re-validate every state claim against the repo before resuming — items below were accurate as of 2026-05-04 but the resume window may be weeks out.
+> **Reference docs at deferral time:** `docs/planning/TECH_DEBT_PROGRAM.md`, `docs/planning/td_001_route_integration_tests.md`, `docs/planning/sprint_review_20260504.md`.
+
+---
+
 > **Paste this entire document as the first message in a fresh chat.** The new Claude instance has zero prior conversation history; this prompt is authoritative. Verify every claim by reading the files listed before writing any code.
 
 ---
