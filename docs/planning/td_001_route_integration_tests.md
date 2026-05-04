@@ -1,11 +1,18 @@
 # TD-001 — Route Integration Tests (Real DB, No Mocks)
 
+> **STATUS — 2026-05-04: DEFERRED until TD-006 closes.**
+> Same-day sequence correction moved TD-006 ahead of TD-001 in the program (see `docs/planning/TECH_DEBT_PROGRAM.md` § "Sequence (corrected 2026-05-04)" and § "Lessons"). TD-001's integration tests run in the `db-tests-postgres` CI job, which is broken by TD-006 — meaning TD-001 cannot ship green CI until TD-006 closes first.
+> **Resume condition:** TD-006 [RESOLVED] in the Tech Debt Register, AND `db-tests-postgres` CI green on a fresh push to main.
+> Do NOT execute this ticket until those conditions are met. The Task 1 mock-coverage inventory and other in-scope items remain valid; only the timing changes. When resumed, re-run Task 0 (CI state audit, mechanism D) and Task 4's walk-the-merge projection (mechanism E) before code.
+
+---
+
 > **Severity:** HIGH
 > **Opened:** 2026-04-02 (Sprint 1)
 > **Days open at ticket creation:** 32 (RED threshold crossed 2026-05-04)
-> **Activated:** 2026-05-04 as TD program item #1
-> **Branch:** `fix/td-001-route-integration-tests` (to be created in step 2 of the framework)
-> **Pre-flight tag:** `pre-td-001` (to be created in step 1 of the framework)
+> **Activated:** 2026-05-04 as TD program item #1 — *re-sequenced same day to item #2 behind TD-006*
+> **Branch:** `fix/td-001-route-integration-tests` (to be created in step 2 of the framework, after TD-006 closes)
+> **Pre-flight tag:** `pre-td-001` (to be created in step 1 of the framework, after TD-006 closes)
 > **Framework reference:** `docs/planning/TECH_DEBT_PROGRAM.md`
 
 ---

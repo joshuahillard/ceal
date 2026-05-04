@@ -238,6 +238,30 @@ On April 2, `main` was reset to `codex/semantic-fidelity-guardrail`, which lost 
 
 ---
 
+#### Monday, May 4, 2026 — Tech Debt Program Sequence Corrected (same-day)
+
+**Trigger:** Within hours of pushing the program kickoff (`f79099c`), the operator pointed at the failing `db-tests-postgres` CI job from the same push and asked whether it was a new failure. Investigation confirmed the long-standing TD-006 (red since 2026-04-08). Cross-checking against TD-001's planned location (integration tests in `tests/integration/`) revealed that TD-001's tests would inherit TD-006's setup error on PostgreSQL CI — meaning TD-001 could not ship green CI without TD-006 closing first.
+
+**What changed:**
+- **Sequence reversed:** TD-006 → TD-001 → TD-003 → TD-002 → TD-005 (was TD-001 → TD-006 → ...).
+- **Five new pre-execution mechanisms** (A–E) added to the framework: Pre-program CI audit (A), Cross-TD Dependency graph (B), Operator review on program design (C), Per-TD Task 0 CI audit (D), Walk-the-merge projection (E).
+- **Cross-TD Dependencies table** added to `TECH_DEBT_PROGRAM.md`.
+- **Lessons section** added to `TECH_DEBT_PROGRAM.md` recording the precedent.
+- **TD-001 ticket** marked DEFERRED via STATUS header.
+- **Tech Debt Register** annotation updated to reflect TD-006 in-flight, TD-001 deferred.
+
+**Commit:** (this entry's commit) `docs(planning): tech debt program sequence correction (TD-006 first)`
+
+**Test count:** 355 (unchanged; planning-only)
+**Effort:** Low.
+
+**Retrospective:**
+- *What went well:* Operator caught the oversight within hours, before any TD code shipped. The framework's "operator pause" gates worked even though the program's *design* lacked one — operator review functioned as the missing C-mechanism retroactively.
+- *What went wrong:* The program author (Claude) sequenced from abstract register descriptions and reasoned about TD-001 and TD-006 as different layers. The CI graph was already in context (the same session pulled CI runs for the sprint review hours earlier) but was never cross-referenced against the proposed sequence. The framework's strength was forcing rigor on per-TD execution; the gap was that the framework's own design was inscribed without the same rigor applied to it.
+- *Lesson:* "Verify before asserting" applies to program design as much as to per-TD execution. Mechanisms A–E close that gap with defense in depth — A and B catch at design time, D and E at ticket time, C is the operator-side gate. One failed mechanism doesn't lose the catch.
+
+---
+
 ## Decision Log
 
 ### ADR-001: Pydantic v2 at Every Pipeline Boundary (March 28)
@@ -314,16 +338,16 @@ On April 2, `main` was reset to `codex/semantic-fidelity-guardrail`, which lost 
 
 ## Technical Debt Register
 
-> **Active program — 2026-05-04.** Sequence: TD-001 → TD-006 → TD-003 → TD-002 → TD-005. Framework and rollback playbook at `docs/planning/TECH_DEBT_PROGRAM.md`. Per-TD tickets land at `docs/planning/td_NNN_<slug>.md`. TD-001 is the current in-flight item.
+> **Active program — 2026-05-04** (sequence corrected same day after operator caught a CI dependency miss). Sequence: **TD-006 → TD-001 → TD-003 → TD-002 → TD-005**. Framework, Cross-TD Dependencies table, rollback playbook, and the five pre-execution mechanisms (A–E) at `docs/planning/TECH_DEBT_PROGRAM.md`. Per-TD tickets land at `docs/planning/td_NNN_<slug>.md`. **TD-006 is the current in-flight item; TD-001 deferred until TD-006 closes.**
 
 | ID | Description | Severity | Introduced | Status |
 |----|-------------|----------|------------|--------|
-| TD-001 | Mock-only route tests hide SQL bugs. Core query functions need DB-level integration tests. | High | Sprint 1 | Open — in-flight (ticket: `docs/planning/td_001_route_integration_tests.md`) |
+| TD-001 | Mock-only route tests hide SQL bugs. Core query functions need DB-level integration tests. | High | Sprint 1 | Open — DEFERRED until TD-006 closes (ticket: `docs/planning/td_001_route_integration_tests.md`) |
 | TD-002 | LLM keyword-stuffs job requirements into resume bullets regardless of candidate's actual skills. Tier prompts need a "only reference skills the candidate has" constraint. | Medium | Sprint 1 | Open |
 | TD-003 | Existing `ceal.db` won't have Sprint 9 regime columns (CREATE TABLE IF NOT EXISTS doesn't ALTER). Need Alembic migration or manual ALTER TABLE. | Medium | Sprint 9 | Open |
 | TD-004 | No prompt registry — `RANKER_VERSION` tracks version but no document maps version to actual prompt text. | Medium | Phase 1 | Resolved (PROMPT_REGISTRY.md created April 3) |
 | TD-005 | Two schema files (`schema.sql` + `schema_postgres.sql`) must be kept in sync manually. | Low | Sprint 6 | Open |
-| TD-006 | PostgreSQL DB Tests CI fails because the schema loader sends multi-command SQL blocks (including `DO $$ ... $$` / trigger setup) through asyncpg prepared statements. | High | Sprint 11 | Open |
+| TD-006 | PostgreSQL DB Tests CI fails because the schema loader sends multi-command SQL blocks (including `DO $$ ... $$` / trigger setup) through asyncpg prepared statements. | High | Sprint 11 | Open — in-flight (ticket: to be authored as next step in TD program) |
 
 ---
 
