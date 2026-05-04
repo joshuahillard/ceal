@@ -12,6 +12,7 @@
 > **Branch:** `fix/td-007-postgres-datetime-strings` (to be created after TD-006 closes)
 > **Pre-flight tag:** `pre-td-007`
 > **Framework reference:** `docs/planning/TECH_DEBT_PROGRAM.md`
+> **Kickoff prompt for fresh chat:** `docs/planning/TD_007_KICKOFF_PROMPT.md`
 > **Discovery context:** `docs/session_notes/2026-05-04_td_006_postgres_schema_loader.md` § "Masked-bugs cascade"
 
 ---
