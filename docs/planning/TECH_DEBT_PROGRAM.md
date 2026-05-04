@@ -41,29 +41,39 @@ Five mechanisms added 2026-05-04 to prevent sequencing oversights. Each closes a
 
 **E. Walk-the-merge projection.** Part of Task 4 (plan + scope pause). For each TD ticket, write a literal projection of what `git status` and `gh run list --limit 5` will show *the moment after that TD merges*. If the answer is "still red on `<job>`," the TD is not ready to ship — either the dependency has to land first, or the gate has to be explicitly carved out with operator sign-off recorded in the ticket.
 
-## Sequence (corrected 2026-05-04)
+## Sequence (corrected 2026-05-04, expanded 2026-05-04 post-TD-006)
 
 | Order | TD | Severity | Days open at activation | Rationale |
 |---|---|---|---|---|
 | 1 | **TD-006** | HIGH | 18 | Schema loader bug breaking PostgreSQL CI since 2026-04-08. Blocks every other TD from shipping green CI because `db-tests-postgres` runs all of `tests/integration/`. **First — unblocks CI signal that gates every later commit.** |
-| 2 | TD-001 | HIGH | 32 (⚠ RED) | Mock-only route tests; original program-#1. Ships green only after TD-006 unblocks `db-tests-postgres`. |
-| 3 | TD-003 | Medium | 31 | DB migration for Sprint 9 regime columns; depends on TD-006 backend parity to run on PostgreSQL. |
-| 4 | TD-002 | Medium | 32 | Prompt fix; independent of CI infra. Runs after HIGH items close. |
-| 5 | TD-005 | Low | 32 | Process gap (schema file drift); cheap, last. |
+| 2 | **TD-007** | HIGH | 0 (opened during TD-006) | Datetime ISO strings rejected by asyncpg for typed columns. Pre-existing bug masked by TD-006. Affects ~16 integration tests across 4 files. Blocks `db-tests-postgres` full-green. |
+| 3 | **TD-008** | Medium | 0 (opened during TD-006) | `round()` requires `CAST(x AS numeric)` on Postgres. Pre-existing bug masked by TD-006. Affects 4 pipeline tests. |
+| 4 | **TD-009** | Medium | 0 (opened during TD-006) | SERIAL sequence not advanced after explicit-id fixture INSERTs. Test-fixture-only. Affects regime fixture; audit may surface more. |
+| 5 | TD-001 | HIGH | 32 (⚠ RED) | Mock-only route tests; original program-#1. Ships green only after TD-006/007/008/009 unblock `db-tests-postgres`. |
+| 6 | TD-003 | Medium | 31 | DB migration for Sprint 9 regime columns; depends on TD-006/007/009 backend parity to run on PostgreSQL. |
+| 7 | TD-002 | Medium | 32 | Prompt fix; independent of CI infra. Runs after HIGH items close. |
+| 8 | TD-005 | Low | 32 | Process gap (schema file drift); cheap, last. |
 
-**Ordering rule (corrected):** CI-blocking dependency first, then severity, then non-blocking dependency, then age. The original "severity first, then dependency, then age" rule under-weighted CI-blocking dependencies. Fixed here.
+**Ordering rule (corrected, reaffirmed 2026-05-04 post-TD-006):** CI-blocking dependency first, then severity, then non-blocking dependency, then age. The original "severity first, then dependency, then age" rule under-weighted CI-blocking dependencies. The TD-007/008/009 insertion preserves that rule — they are CI-blocking on `db-tests-postgres` for every later ticket.
+
+**Masked-bugs handling:** TD-007/008/009 were authored *during* TD-006's execution as findings, not in advance. They follow the same authoring discipline as any other TD in this program (per-TD ticket file, mechanisms D + E re-run at session start, walk-the-merge projection). The discovery pattern is recorded in § "Lessons" so the framework treats this kind of cascade as expected, not exceptional.
 
 ## Cross-TD Dependencies
 
 | TD | CI jobs that run its tests/code | Currently-red jobs that block green-CI ship | TDs that must close first |
 |---|---|---|---|
-| TD-006 | `db-tests-postgres`, `unit-tests`, `integration-tests`, `coverage` | (target of fix — turns `db-tests-postgres` green) | None |
-| TD-001 | `unit-tests`, `integration-tests`, `db-tests-postgres`, `coverage` | `db-tests-postgres` (new integration tests inherit the broken setup on PostgreSQL) | **TD-006** |
-| TD-003 | `db-tests-postgres`, `integration-tests`, `unit-tests` | `db-tests-postgres` (migration must run on PostgreSQL) | **TD-006** |
+| TD-006 | `db-tests-postgres`, `unit-tests`, `integration-tests`, `coverage` | (target of fix — turns `db-tests-postgres` green for the schema-loader-specific failure) | None |
+| TD-007 | `db-tests-postgres`, `integration-tests` | `db-tests-postgres` (datetime-string rejection across ~16 tests) | **TD-006** (mask removal) |
+| TD-008 | `db-tests-postgres`, `integration-tests` | `db-tests-postgres` (round-cast across 4 pipeline tests) | **TD-006** (mask removal) |
+| TD-009 | `db-tests-postgres`, `integration-tests` | `db-tests-postgres` (SERIAL fixture across regime tests + audit-pending more) | **TD-006** (mask removal) |
+| TD-001 | `unit-tests`, `integration-tests`, `db-tests-postgres`, `coverage` | `db-tests-postgres` (new integration tests inherit any unresolved masked bug) | **TD-006, TD-007, TD-008, TD-009** |
+| TD-003 | `db-tests-postgres`, `integration-tests`, `unit-tests` | `db-tests-postgres` (migration must run on PostgreSQL) | **TD-006, TD-007, TD-009** |
 | TD-002 | `unit-tests`, `coverage` | None | None |
 | TD-005 | (CI workflow file itself; possibly a new lint job) | None | None |
 
 If a TD's "blocking jobs" column is non-empty, the TDs in "must close first" come before it in the sequence.
+
+**Note on TD-006 closure (2026-05-04):** `db-tests-postgres` does *not* go fully green at TD-006 closure because TD-007/008/009 still gate ~22 tests via `postgres_skip_td` markers. TD-006's own success criterion — the schema loader's `cannot insert multiple commands` failure stops occurring — is met. Full PostgreSQL test parity arrives when TD-007/008/009 close.
 
 ## Per-TD framework (10 steps, in order)
 
@@ -141,16 +151,41 @@ The program closes when all five TD items in the sequence are [RESOLVED] in the 
 
 **Takeaway.** "Verify before asserting" applies to program design as much as to per-TD execution. Mechanisms A–E close the gap that produced this miss. The lesson lives in the program permanently as a precedent for future programs of work.
 
+### 2026-05-04 — Masked-bugs cascade caught during TD-006 execution
+
+**What happened.** TD-006's named bug — `cannot insert multiple commands into a prepared statement` — was the first PostgreSQL error every test setup hit, so it short-circuited every later code path. Once the executor switch (`exec_driver_sql`) and the splitter guard landed and `init_db()` started succeeding against Postgres, the integration suite walked further into the application code and surfaced three *additional* pre-existing bugs that had been completely invisible:
+
+1. **TD-007** — datetime ISO strings passed to typed PostgreSQL columns (~16 tests across 4 files).
+2. **TD-008** — `round(double precision, integer)` not supported on PostgreSQL; needs `CAST(x AS numeric)` (4 pipeline tests). CLAUDE.md `MODE: db` even called this gotcha out, but no automated check enforced it.
+3. **TD-009** — SERIAL sequence not advanced after explicit-id fixture INSERTs; subsequent auto-INSERTs collide (regime fixture; audit may surface more).
+
+There was also an intermediate masked bug (`drop_all_tables` rejecting `DROP TABLE IF EXISTS` without `CASCADE` on Postgres FKs) that was inseparable from verifying TD-006 worked at all — that one was fixed inside TD-006's commit because it gates *any* test from completing setup. The other three are large enough to deserve their own tickets.
+
+**Root cause of the masking.** A single foundational failure at the start of the test setup chain prevents all downstream code from ever executing on the failing backend. Every bug in the downstream chain is invisible until the foundational fix lands. This is structurally the same pattern as a dead-code-after-throw masking type errors — but at the integration-test level, where it can hide for weeks across many bug classes simultaneously.
+
+**What would have caught it earlier.** The framework's mechanism A (pre-program CI audit) and mechanism D (per-TD CI audit) operate on *named* red jobs. They cannot see bugs that are still masked because no test of those bugs has ever run. The only mechanism that surfaces masked bugs is *executing the foundational fix* — which is what TD-006 just did.
+
+**What the framework adds in response.**
+
+- **Mechanism F — Post-foundational-fix unmasking pass.** When a TD removes a foundational mask (e.g., a fix that is the first error in a long error chain), the per-TD ticket *must* include a tasks step that re-runs the affected test job locally with the fix in place and audits every newly-surfaced failure. Each new failure gets categorized: (i) caused by this TD's change (rollback or fix in scope), or (ii) pre-existing and previously masked (carve out with a tracked marker + new TD ticket). The audit goes in the session note's "Masked-bugs cascade" section; new tickets get authored same-session.
+- **Marker convention — `pytest.mark.postgres_skip_td(reason)`.** Tests gated on follow-up TDs use this marker (registered in `tests/integration/conftest.py`). Each marker carries a TD-NNN reference in `reason`. The marker is *temporary* — it is removed in the commit that closes the named TD. Greppable: `grep -rn "postgres_skip_td" tests/` enumerates outstanding masked-bug debt.
+- **Author follow-up tickets in-session, don't commit them later.** The TD-NNN ticket files exist *as part of TD-006's commit*. The session that discovers a masked bug authors its ticket immediately. This locks in the discovery context (commit SHA, exact stack trace, exact test) at the moment of clearest understanding.
+
+**Takeaway.** Foundational fixes routinely unmask cascades of bugs. The framework should expect this pattern, name it, and provide a clean carve-out so a single TD's commit doesn't grow unbounded. Mechanism F + the `postgres_skip_td` marker + same-session ticket authoring close the gap. Future foundational fixes (e.g., a similar pattern in a different test job) follow the same playbook.
+
 ## Per-TD ticket index
 
 | TD | Ticket | Status |
 |---|---|---|
-| TD-006 | `docs/planning/td_006_postgres_schema_loader.md` | (To be authored — current in-flight item) |
-| TD-001 | `docs/planning/td_001_route_integration_tests.md` | DEFERRED until TD-006 closes (per-ticket STATUS header) |
-| TD-003 | (not yet authored — open after TD-006 closes) | — |
+| TD-006 | `docs/planning/td_006_postgres_schema_loader.md` | In-flight 2026-05-04 — schema loader fix shipped with masked-bug carve-outs (TD-007/008/009 markers); awaiting commit + push approval |
+| TD-007 | `docs/planning/td_007_postgres_datetime_strings.md` | QUEUED — authored during TD-006 closure (masked-bugs cascade); resume when TD-006 closes |
+| TD-008 | `docs/planning/td_008_postgres_round_cast.md` | QUEUED — authored during TD-006 closure (masked-bugs cascade); resume when TD-006 closes |
+| TD-009 | `docs/planning/td_009_postgres_serial_fixtures.md` | QUEUED — authored during TD-006 closure (masked-bugs cascade); resume when TD-006 closes |
+| TD-001 | `docs/planning/td_001_route_integration_tests.md` | DEFERRED until TD-006/007/008/009 close (per-ticket STATUS header — to be updated post-TD-006) |
+| TD-003 | (not yet authored — open after TD-007/008/009 close) | — |
 | TD-002 | (not yet authored) | — |
 | TD-005 | (not yet authored) | — |
 
 ---
 
-*Activated 2026-05-04. Framework corrected 2026-05-04. Owner: Josh Hillard. Current in-flight ticket: `td_006_postgres_schema_loader.md` (to be authored next).*
+*Activated 2026-05-04. Framework corrected 2026-05-04. Sequence expanded 2026-05-04 post-TD-006 (masked-bugs cascade). Owner: Josh Hillard. Current in-flight ticket: `td_006_postgres_schema_loader.md`. Next in queue: TD-007 (datetime strings), TD-008 (round-cast), TD-009 (SERIAL fixtures) — order TBD at TD-006 closure based on impact and operator preference.*

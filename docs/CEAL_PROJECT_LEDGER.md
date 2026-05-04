@@ -262,6 +262,52 @@ On April 2, `main` was reset to `codex/semantic-fidelity-guardrail`, which lost 
 
 ---
 
+#### Monday, May 4, 2026 — TD-006 RESOLVED + Masked-Bugs Cascade Surfaces (TD-007/008/009 authored)
+
+**What shipped (TD-006 itself):**
+- `src/models/database.py:init_db()` — PostgreSQL branch switched from `await conn.execute(text(stmt))` to `await conn.exec_driver_sql(stmt)`. Routes through asyncpg's simple-query protocol, which accepts multi-command DDL strings. SQLite branch unchanged at the line level.
+- `src/models/database.py:_split_sql_statements()` — `in_trigger` flag now guarded by `not in_dollar_quote`. Pre-fix the splitter eagerly tracked `CREATE TRIGGER` lines that appeared inside `DO $$ ... $$;` blocks, then waited for an `END` line that never came, accumulating ~30 statements into one 4262-char blob. Post-fix the schema correctly emits 37 separate statements (was 18). SQLite splitter behavior unchanged (82 statements).
+- `tests/integration/conftest.py:drop_all_tables()` — added `CASCADE` for the PostgreSQL branch. Pre-fix this rejected `DROP TABLE IF EXISTS` when foreign keys existed; that bug was completely masked by TD-006 because no test ever reached the second autouse-fixture invocation.
+
+**Coverage added:**
+- `tests/integration/test_init_db_multi_command_ddl.py` — 3 PostgreSQL-only positive smoke tests asserting trigger functions land in `pg_proc`, triggers in `pg_trigger`, and `init_db()` is idempotent.
+- `tests/unit/test_split_sql_statements.py` — 4 backend-agnostic unit tests pinning splitter behavior on SQLite triggers, plpgsql functions, and the TD-006 regression case (CREATE TRIGGER inside DO block).
+
+**Masked-bugs cascade discovered post-fix:** Three pre-existing PostgreSQL-incompatible patterns that TD-006 had been hiding emerged immediately after `init_db()` started succeeding:
+- **TD-007** (HIGH) — datetime ISO strings rejected by asyncpg on typed columns. ~16 tests across 4 files.
+- **TD-008** (Medium) — `round(double precision, integer)` not supported on Postgres. 4 pipeline tests. CLAUDE.md `MODE: db` calls this out, but no automated check enforces it.
+- **TD-009** (Medium) — SERIAL sequence not advanced after explicit-id fixture INSERTs. Regime fixture; audit pending.
+
+These were carved out as their own tickets — `docs/planning/td_007_*.md`, `td_008_*.md`, `td_009_*.md` — and gated in tests via a new `pytest.mark.postgres_skip_td(reason)` marker registered in `tests/integration/conftest.py`. Each marker carries its TD-NNN reference and is removed when the corresponding TD closes.
+
+**Framework additions:**
+- **Mechanism F — Post-foundational-fix unmasking pass.** Per-TD ticket must, after a foundational fix, re-run the affected job locally and audit every newly-surfaced failure as either (i) caused by this TD's change or (ii) pre-existing/masked. Pre-existing failures get carved out via `postgres_skip_td` + a same-session ticket file.
+- **`pytest.mark.postgres_skip_td(reason)` marker convention.** Registered in `tests/integration/conftest.py`. Greppable: `grep -rn "postgres_skip_td" tests/` enumerates outstanding masked-bug debt.
+- **Same-session ticket authoring rule.** Follow-up tickets are authored in the same commit as the foundational fix, while context is sharpest. No "I'll write the ticket later."
+
+**Sequence expanded:** TD-006 → **TD-007 → TD-008 → TD-009** → TD-001 → TD-003 → TD-002 → TD-005. TD-001's STATUS header updated to require all four (TD-006/007/008/009) before resuming.
+
+**CI evidence (post-fix, against `localhost:5433` with docker `postgres:16-alpine`):**
+- Ruff: green
+- SQLite full suite: 359 passed, 3 skipped (was 355 baseline; +4 splitter unit tests; 3 = PG-only smoke tests skipped on SQLite)
+- PostgreSQL `tests/integration/`: **9 passed, 29 skipped, 0 failures.** Was previously 28 ERRORs at setup. Skipped breakdown: 22 deferred to TD-007/008/009 via `postgres_skip_td`, 7 `sqlite_only` markers.
+
+**Walk-the-merge projection (per ticket):**
+- `db-tests-postgres` job: ❌ red → ✅ green (passing tests + skipped tests, zero failures) ✓
+- All other 7 jobs: still ✅ green ✓
+
+**Commit:** (this entry's commit) `fix(db): TD-006 PostgreSQL schema loader multi-command + masked-bugs cascade carve-out`
+
+**Test count:** 355 → 359 (SQLite). Net +4 unit tests. (3 new integration smoke tests pass on Postgres only.)
+**Effort:** Heavier than scoped — three HITL pause moments mid-execution surfaced scope expansions (splitter bug, conftest CASCADE, masked-bugs cascade). Each was operator-greenlit before code.
+
+**Retrospective:**
+- *What went well:* HITL governance held. Each scope expansion paused for explicit operator decision rather than blasting through. The splitter bug — which the ticket explicitly carved out — was caught by direct empirical evidence (37-statement output), not assumed correct from inspection. Masked-bugs cascade discovery led to authoring three new tickets *in-session* with full context, plus a framework upgrade (Mechanism F + marker convention) so the same shape of cascade is expected and clean next time.
+- *What went wrong:* The TD-006 ticket's "splitter is correct" assertion was wrong (per inspection, not per output). Future tickets should distinguish "I read the code and reasoned" from "I dumped its output and verified." The empirical check at execution time caught it, but a stronger ticket would have run that check at authoring time.
+- *Lesson:* "Verify before asserting" goes one level deeper than program design — it applies to *every* claim a ticket makes about whether something is correct. Add to per-TD framework: any ticket that says "X is correct, do not modify" should include the empirical check that proves it (output dump, test run, inspection methodology). Otherwise the assertion is hearsay.
+
+---
+
 ## Decision Log
 
 ### ADR-001: Pydantic v2 at Every Pipeline Boundary (March 28)
@@ -338,16 +384,19 @@ On April 2, `main` was reset to `codex/semantic-fidelity-guardrail`, which lost 
 
 ## Technical Debt Register
 
-> **Active program — 2026-05-04** (sequence corrected same day after operator caught a CI dependency miss). Sequence: **TD-006 → TD-001 → TD-003 → TD-002 → TD-005**. Framework, Cross-TD Dependencies table, rollback playbook, and the five pre-execution mechanisms (A–E) at `docs/planning/TECH_DEBT_PROGRAM.md`. Per-TD tickets land at `docs/planning/td_NNN_<slug>.md`. **TD-006 is the current in-flight item; TD-001 deferred until TD-006 closes.**
+> **Active program — 2026-05-04** (sequence corrected same day; expanded same day post-TD-006 with the masked-bugs cascade — see § "Lessons" in `docs/planning/TECH_DEBT_PROGRAM.md`). Current sequence: **TD-006 → TD-007 → TD-008 → TD-009 → TD-001 → TD-003 → TD-002 → TD-005**. Framework, Cross-TD Dependencies table, rollback playbook, and the six pre-execution mechanisms (A–F) at `docs/planning/TECH_DEBT_PROGRAM.md`. Per-TD tickets land at `docs/planning/td_NNN_<slug>.md`. **TD-006 closed 2026-05-04 (this entry's commit); TD-007/008/009 queued; TD-001 deferred until TD-006/007/008/009 close.**
 
 | ID | Description | Severity | Introduced | Status |
 |----|-------------|----------|------------|--------|
-| TD-001 | Mock-only route tests hide SQL bugs. Core query functions need DB-level integration tests. | High | Sprint 1 | Open — DEFERRED until TD-006 closes (ticket: `docs/planning/td_001_route_integration_tests.md`) |
+| TD-001 | Mock-only route tests hide SQL bugs. Core query functions need DB-level integration tests. | High | Sprint 1 | Open — DEFERRED until TD-006/007/008/009 close (ticket: `docs/planning/td_001_route_integration_tests.md`) |
 | TD-002 | LLM keyword-stuffs job requirements into resume bullets regardless of candidate's actual skills. Tier prompts need a "only reference skills the candidate has" constraint. | Medium | Sprint 1 | Open |
 | TD-003 | Existing `ceal.db` won't have Sprint 9 regime columns (CREATE TABLE IF NOT EXISTS doesn't ALTER). Need Alembic migration or manual ALTER TABLE. | Medium | Sprint 9 | Open |
 | TD-004 | No prompt registry — `RANKER_VERSION` tracks version but no document maps version to actual prompt text. | Medium | Phase 1 | Resolved (PROMPT_REGISTRY.md created April 3) |
 | TD-005 | Two schema files (`schema.sql` + `schema_postgres.sql`) must be kept in sync manually. | Low | Sprint 6 | Open |
-| TD-006 | PostgreSQL DB Tests CI fails because the schema loader sends multi-command SQL blocks (including `DO $$ ... $$` / trigger setup) through asyncpg prepared statements. | High | Sprint 11 | Open — in-flight (ticket: to be authored as next step in TD program) |
+| TD-006 | PostgreSQL DB Tests CI fails because the schema loader sends multi-command SQL blocks (including `DO $$ ... $$` / trigger setup) through asyncpg prepared statements. | High | Sprint 11 | **[RESOLVED 2026-05-04]** — schema loader fix (`exec_driver_sql`) + splitter guard (`in_dollar_quote` gate on `CREATE TRIGGER` tracking) + conftest CASCADE for masked drop-FK bug. Ticket: `docs/planning/td_006_postgres_schema_loader.md`. Smoke log: `docs/smoke_logs/td_006_20260504.md`. |
+| TD-007 | PostgreSQL asyncpg rejects ISO datetime strings on typed columns; SQLite silently coerces. ~16 integration tests gated. | High | Sprint 11 (masked by TD-006; surfaced 2026-05-04) | Open — QUEUED (ticket: `docs/planning/td_007_postgres_datetime_strings.md`) |
+| TD-008 | PostgreSQL `round(double precision, integer)` not supported; needs `CAST(x AS numeric)`. 4 pipeline tests gated. | Medium | Sprint 11 (masked by TD-006; surfaced 2026-05-04) | Open — QUEUED (ticket: `docs/planning/td_008_postgres_round_cast.md`) |
+| TD-009 | PostgreSQL SERIAL sequence not advanced after explicit-id fixture INSERTs; subsequent auto-INSERT collides. Test-fixture-only. | Medium | Sprint 11 (masked by TD-006; surfaced 2026-05-04) | Open — QUEUED (ticket: `docs/planning/td_009_postgres_serial_fixtures.md`) |
 
 ---
 

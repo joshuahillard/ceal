@@ -159,11 +159,13 @@ async def init_db(schema_path: str | None = None) -> None:
                 if stmt:
                     await session.execute(text(stmt))
     else:
-        # PostgreSQL: use engine.begin() for DDL outside session manager
+        # PostgreSQL: use engine.begin() for DDL outside session manager.
+        # exec_driver_sql bypasses asyncpg's prepared-statement protocol so
+        # multi-command DDL blocks (DO $$ ... $$, function bodies) load cleanly. (TD-006)
         async with engine.begin() as conn:
             for stmt in statements:
                 if stmt:
-                    await conn.execute(text(stmt))
+                    await conn.exec_driver_sql(stmt)
 
     # Keep startup behavior consistent across backends for auto-apply flows.
     async with get_session() as session:
@@ -291,8 +293,10 @@ def _split_sql_statements(sql: str) -> list[str]:
         if dollar_count % 2 == 1:
             in_dollar_quote = not in_dollar_quote
 
-        # Track SQLite trigger blocks
-        if stripped.upper().startswith("CREATE TRIGGER"):
+        # Track SQLite trigger blocks. Skip when inside a PostgreSQL dollar-quoted
+        # body, where CREATE TRIGGER is a sub-statement of a DO block, not a
+        # top-level SQLite trigger (TD-006).
+        if not in_dollar_quote and stripped.upper().startswith("CREATE TRIGGER"):
             in_trigger = True
 
         current.append(stripped)

@@ -1,9 +1,9 @@
 # TD-001 — Route Integration Tests (Real DB, No Mocks)
 
-> **STATUS — 2026-05-04: DEFERRED until TD-006 closes.**
-> Same-day sequence correction moved TD-006 ahead of TD-001 in the program (see `docs/planning/TECH_DEBT_PROGRAM.md` § "Sequence (corrected 2026-05-04)" and § "Lessons"). TD-001's integration tests run in the `db-tests-postgres` CI job, which is broken by TD-006 — meaning TD-001 cannot ship green CI until TD-006 closes first.
-> **Resume condition:** TD-006 [RESOLVED] in the Tech Debt Register, AND `db-tests-postgres` CI green on a fresh push to main.
-> Do NOT execute this ticket until those conditions are met. The Task 1 mock-coverage inventory and other in-scope items remain valid; only the timing changes. When resumed, re-run Task 0 (CI state audit, mechanism D) and Task 4's walk-the-merge projection (mechanism E) before code.
+> **STATUS — 2026-05-04 (updated): DEFERRED until TD-006/007/008/009 close.**
+> Same-day sequence correction moved TD-006 ahead of TD-001 in the program (see `docs/planning/TECH_DEBT_PROGRAM.md` § "Sequence" and § "Lessons"). TD-006 closed 2026-05-04, but its execution surfaced a masked-bugs cascade — three pre-existing PostgreSQL-incompatible patterns (TD-007 datetime strings, TD-008 round-cast, TD-009 SERIAL fixtures) that had been hidden behind TD-006's setup error. TD-001 will add new integration tests in `tests/integration/`, which run in `db-tests-postgres` and can inherit any unresolved masked bug. TD-001 therefore now waits on the full chain.
+> **Resume condition:** TD-006/007/008/009 all [RESOLVED] in the Tech Debt Register, AND `db-tests-postgres` CI green on a fresh push to main *with all `pytest.mark.postgres_skip_td` markers removed*. Until those markers are gone, "green CI" includes 22+ skipped tests that TD-001's new tests should be running through.
+> Do NOT execute this ticket until those conditions are met. The Task 1 mock-coverage inventory and other in-scope items remain valid; only the timing changes. When resumed, re-run Task 0 (CI state audit, mechanism D), Task 4's walk-the-merge projection (mechanism E), AND grep `tests/` for any remaining `postgres_skip_td` markers (mechanism F) before code.
 
 ---
 
